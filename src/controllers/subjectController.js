@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 const getAllSubjects = async (req, res) => {
   try {
-    const { search, sortBy, order, page, limit } = req.query;
+    const { search, sortBy, order, sort, page, limit } = req.query;
 
     // Build where clause
     const where = {};
@@ -12,15 +12,15 @@ const getAllSubjects = async (req, res) => {
     // Search by name or code
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { code: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { code: { contains: search } }
       ];
     }
 
-    // Build orderBy clause
-    const validSortFields = ['id', 'name', 'code', 'created_at'];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : 'id';
-    const sortOrder = order === 'desc' ? 'desc' : 'asc';
+    // Build orderBy clause - support both sortBy/order and order/sort patterns
+    const validSortFields = ['id', 'name', 'code'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'id');
+    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
 
     const orderBy = { [sortField]: sortOrder };
 
@@ -42,13 +42,12 @@ const getAllSubjects = async (req, res) => {
         id: true,
         code: true,
         name: true,
-        created_at: true
       }
     });
 
     // Return with pagination metadata
     return res.status(200).json({
-      success: true,
+      status: true,
       message: 'Berhasil mengambil data mata pelajaran',
       data: subjects,
       pagination: {
@@ -61,7 +60,7 @@ const getAllSubjects = async (req, res) => {
   } catch (error) {
     console.error('Error getAllSubjects:', error);
     return res.status(500).json({
-      success: false,
+      status: false,
       message: 'Gagal mengambil data mata pelajaran'
     });
   }
@@ -76,20 +75,20 @@ const getSubjectById = async (req, res) => {
 
     if (!subject) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Mata pelajaran tidak ditemukan'
       });
     }
 
     return res.status(200).json({
-      success: true,
+      status: true,
       message: 'Berhasil mengambil data mata pelajaran',
       data: subject
     });
   } catch (error) {
     console.error('Error getSubjectById:', error);
     return res.status(500).json({
-      success: false,
+      status: false,
       message: 'Gagal mengambil data mata pelajaran'
     });
   }
@@ -102,7 +101,7 @@ const createSubject = async (req, res) => {
     // Validasi input
     if (!name || !code) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Kode dan nama mata pelajaran wajib diisi'
       });
     }
@@ -114,7 +113,7 @@ const createSubject = async (req, res) => {
 
     if (existingSubject) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Kode mata pelajaran sudah digunakan'
       });
     }
@@ -124,14 +123,14 @@ const createSubject = async (req, res) => {
     });
 
     return res.status(201).json({
-      success: true,
+      status: true,
       message: 'Mata pelajaran berhasil ditambahkan',
       data: subject
     });
   } catch (error) {
     console.error('Error createSubject:', error);
     return res.status(500).json({
-      success: false,
+      status: false,
       message: 'Gagal menambahkan mata pelajaran'
     });
   }
@@ -149,7 +148,7 @@ const updateSubject = async (req, res) => {
 
     if (!existingSubject) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Mata pelajaran tidak ditemukan'
       });
     }
@@ -162,7 +161,7 @@ const updateSubject = async (req, res) => {
 
       if (codeExists) {
         return res.status(400).json({
-          success: false,
+          status: false,
           message: 'Kode mata pelajaran sudah digunakan'
         });
       }
@@ -178,14 +177,14 @@ const updateSubject = async (req, res) => {
     });
 
     return res.status(200).json({
-      success: true,
+      status: true,
       message: 'Mata pelajaran berhasil diupdate',
       data: subject
     });
   } catch (error) {
     console.error('Error updateSubject:', error);
     return res.status(500).json({
-      success: false,
+      status: false,
       message: 'Gagal mengupdate mata pelajaran'
     });
   }
@@ -202,7 +201,7 @@ const deleteSubject = async (req, res) => {
 
     if (!existingSubject) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Mata pelajaran tidak ditemukan'
       });
     }
@@ -212,14 +211,14 @@ const deleteSubject = async (req, res) => {
     });
 
     return res.status(200).json({
-      success: true,
+      status: true,
       message: 'Mata pelajaran berhasil dihapus',
       data: { id: parseInt(id) }
     });
   } catch (error) {
     console.error('Error deleteSubject:', error);
     return res.status(500).json({
-      success: false,
+      status: false,
       message: 'Gagal menghapus mata pelajaran'
     });
   }

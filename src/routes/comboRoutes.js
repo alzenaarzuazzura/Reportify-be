@@ -14,11 +14,11 @@ router.use(authenticate);
 router.get('/levels', comboController.getLevelsCombo);
 
 /**
- * @route   GET /combo/levels
- * @desc    Get all levels for combo select
+ * @route   GET /combo/subjects
+ * @desc    Get all subjects for combo select
  * @access  Private
  */
-router.get('/subjects'), comboController.getSubjectsCombo
+router.get('/subjects', comboController.getSubjectsCombo);
 
 /**
  * @route   GET /combo/majors
@@ -54,5 +54,19 @@ router.get('/teachers', comboController.getTeachersCombo);
  * @access  Private
  */
 router.get('/students', comboController.getStudentsCombo);
+
+/**
+ * @route   GET /combo/classes
+ * @desc    Get all classes for combo select
+ * @access  Private
+ */
+router.get('/classes', comboController.getClassesCombo);
+
+/**
+ * @route   GET /combo/teaching-assignments
+ * @desc    Get all teaching assignments for combo select
+ * @access  Private
+ */
+router.get('/teaching-assignments', comboController.getTeachingAssignmentsCombo);
 
 module.exports = router;

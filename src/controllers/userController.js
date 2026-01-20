@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 const getAllUsers = async (req, res) => {
   try {
-    const { search, role, sortBy, order, page, limit } = req.query;
+    const { search, role, sortBy, order, sort, page, limit } = req.query;
 
     // Build where clause
     const where = {};
@@ -14,8 +14,9 @@ const getAllUsers = async (req, res) => {
     // Search by name or email
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { email: { contains: search } },
+        { telephone: { contains: search } },
       ];
     }
 
@@ -24,10 +25,10 @@ const getAllUsers = async (req, res) => {
       where.role = role;
     }
 
-    // Build orderBy clause
-    const validSortFields = ['id', 'name', 'email', 'role', 'created_at'];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : 'id';
-    const sortOrder = order === 'desc' ? 'desc' : 'asc';
+    // Build orderBy clause - support both sortBy/order and order/sort patterns
+    const validSortFields = ['id', 'name', 'email', 'telephone', 'role', 'created_at'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'id');
+    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
 
     const orderBy = { [sortField]: sortOrder };
 
@@ -49,6 +50,7 @@ const getAllUsers = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        telephone: true,
         role: true,
         created_at: true
       }
@@ -83,6 +85,7 @@ const getUserById = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        telephone: true,
         role: true,
         created_at: true
       }
@@ -107,10 +110,10 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, telephone, password, role } = req.body;
 
     // Validasi input
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !telephone || !password || !role) {
       return res.status(400).json(
         errorResponse('Semua field wajib diisi')
       );
@@ -133,6 +136,7 @@ const createUser = async (req, res) => {
       data: {
         name,
         email,
+        telephone,
         password: hashedPassword,
         role
       },
@@ -140,6 +144,7 @@ const createUser = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        telephone: true,
         role: true,
         created_at: true
       }
@@ -159,7 +164,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password, role } = req.body;
+    const { name, email, telephone, password, role } = req.body;
 
     // Cek user exists
     const existingUser = await prisma.users.findUnique({
@@ -188,6 +193,7 @@ const updateUser = async (req, res) => {
     const updateData = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
+    if (telephone) updateData.telephone = telephone;
     if (role) updateData.role = role;
     
     if (password) {
@@ -201,6 +207,7 @@ const updateUser = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        telephone: true,
         role: true,
         created_at: true
       }

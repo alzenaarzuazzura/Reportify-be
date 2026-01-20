@@ -161,6 +161,52 @@ const getStudentsCombo = async (req, res) => {
   }
 };
 
+/**
+ * Get classes combo
+ * @route GET /combo/classes
+ */
+const getClassesCombo = async (req, res) => {
+  try {
+    const data = await comboService.getClasses();
+    
+    return res.status(200).json({
+      data,
+      message: 'success',
+      status: true,
+    });
+  } catch (error) {
+    console.error('Error getClassesCombo:', error);
+    return res.status(500).json({
+      data: [],
+      message: 'failed',
+      status: false,
+    });
+  }
+};
+
+/**
+ * Get teaching assignments combo
+ * @route GET /combo/teaching-assignments
+ */
+const getTeachingAssignmentsCombo = async (req, res) => {
+  try {
+    const data = await comboService.getTeachingAssignments();
+    
+    return res.status(200).json({
+      data,
+      message: 'success',
+      status: true,
+    });
+  } catch (error) {
+    console.error('Error getTeachingAssignmentsCombo:', error);
+    return res.status(500).json({
+      data: [],
+      message: 'failed',
+      status: false,
+    });
+  }
+};
+
 module.exports = {
   getLevelsCombo,
   getMajorsCombo,
@@ -168,5 +214,7 @@ module.exports = {
   getRolesCombo,
   getTeachersCombo,
   getStudentsCombo,
-  getSubjectsCombo
+  getSubjectsCombo,
+  getClassesCombo,
+  getTeachingAssignmentsCombo
 };

@@ -17,7 +17,6 @@ class QueryBuilder {
       OR: searchFields.map(field => ({
         [field]: {
           contains: search,
-          mode: 'insensitive'
         }
       }))
     };

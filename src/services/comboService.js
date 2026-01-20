@@ -142,6 +142,95 @@ const getStudents = async () => {
   }));
 };
 
+/**
+ * Get all classes for combo select
+ * Format: "Level Major Rombel" (e.g., "X RPL 1")
+ * @returns {Promise<Array>} Array of {value, label}
+ */
+const getClasses = async () => {
+  const classes = await prisma.classes.findMany({
+    select: {
+      id: true,
+      level: {
+        select: {
+          name: true,
+        },
+      },
+      major: {
+        select: {
+          code: true,
+        },
+      },
+      rombel: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: [
+      { id_level: 'asc' },
+      { id_major: 'asc' },
+      { id_rombel: 'asc' },
+    ],
+  });
+
+  return classes.map((classData) => ({
+    value: classData.id,
+    label: `${classData.level.name} ${classData.major.code} ${classData.rombel.name}`,
+  }));
+};
+
+/**
+ * Get all teaching assignments for combo select
+ * Format: "Teacher - Class - Subject"
+ * @returns {Promise<Array>} Array of {value, label}
+ */
+const getTeachingAssignments = async () => {
+  const assignments = await prisma.teaching_assignments.findMany({
+    select: {
+      id: true,
+      user: {
+        select: {
+          name: true,
+        },
+      },
+      class: {
+        select: {
+          level: {
+            select: {
+              name: true,
+            },
+          },
+          major: {
+            select: {
+              code: true,
+            },
+          },
+          rombel: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      subject: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: [
+      { id_user: 'asc' },
+      { id_class: 'asc' },
+    ],
+  });
+
+  return assignments.map((assignment) => ({
+    value: assignment.id,
+    label: `${assignment.user.name} - ${assignment.class.level.name} ${assignment.class.major.code} ${assignment.class.rombel.name} - ${assignment.subject.name}`,
+  }));
+};
+
 module.exports = {
   getLevels,
   getMajors,
@@ -149,5 +238,7 @@ module.exports = {
   getRoles,
   getTeachers,
   getStudents,
-  getSubjects
+  getSubjects,
+  getClasses,
+  getTeachingAssignments
 };

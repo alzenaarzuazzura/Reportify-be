@@ -1,13 +1,19 @@
 const { PrismaClient } = require('@prisma/client');
+const { successResponse, errorResponse } = require('../types/apiResponse');
 
 const prisma = new PrismaClient();
 
 const getAllLevels = async (req, res) => {
   try {
     const levels = await prisma.levels.findMany();
-    res.json(levels);
+    return res.status(200).json(
+      successResponse('Berhasil mengambil data level', levels)
+    );
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+    console.error('Error getAllLevels:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengambil data level')
+    );
   }
 };
 
@@ -19,12 +25,19 @@ const getLevelById = async (req, res) => {
     });
 
     if (!level) {
-      return res.status(404).json({ message: 'Level tidak ditemukan' });
+      return res.status(404).json(
+        errorResponse('Level tidak ditemukan')
+      );
     }
 
-    res.json(level);
+    return res.status(200).json(
+      successResponse('Berhasil mengambil data level', level)
+    );
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+    console.error('Error getLevelById:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengambil data level')
+    );
   }
 };
 
@@ -32,13 +45,25 @@ const createLevel = async (req, res) => {
   try {
     const { name } = req.body;
 
+    // Validasi input
+    if (!name) {
+      return res.status(400).json(
+        errorResponse('Nama level wajib diisi')
+      );
+    }
+
     const level = await prisma.levels.create({
       data: { name }
     });
 
-    res.status(201).json(level);
+    return res.status(201).json(
+      successResponse('Level berhasil ditambahkan', level)
+    );
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+    console.error('Error createLevel:', error);
+    return res.status(500).json(
+      errorResponse('Gagal menambahkan level')
+    );
   }
 };
 
@@ -47,14 +72,33 @@ const updateLevel = async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
 
-    const level = await prisma.levels.update({
-      where: { id: parseInt(id) },
-      data: { name }
+    // Cek level exists
+    const existingLevel = await prisma.levels.findUnique({
+      where: { id: parseInt(id) }
     });
 
-    res.json(level);
+    if (!existingLevel) {
+      return res.status(404).json(
+        errorResponse('Level tidak ditemukan')
+      );
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+
+    const level = await prisma.levels.update({
+      where: { id: parseInt(id) },
+      data: updateData
+    });
+
+    return res.status(200).json(
+      successResponse('Level berhasil diupdate', level)
+    );
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+    console.error('Error updateLevel:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengupdate level')
+    );
   }
 };
 
@@ -62,13 +106,29 @@ const deleteLevel = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Cek level exists
+    const existingLevel = await prisma.levels.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingLevel) {
+      return res.status(404).json(
+        errorResponse('Level tidak ditemukan')
+      );
+    }
+
     await prisma.levels.delete({
       where: { id: parseInt(id) }
     });
 
-    res.json({ message: 'Level berhasil dihapus' });
+    return res.status(200).json(
+      successResponse('Level berhasil dihapus', { id: parseInt(id) })
+    );
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+    console.error('Error deleteLevel:', error);
+    return res.status(500).json(
+      errorResponse('Gagal menghapus level')
+    );
   }
 };
 

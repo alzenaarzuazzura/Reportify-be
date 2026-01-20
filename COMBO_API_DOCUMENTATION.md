@@ -202,6 +202,40 @@ curl -X GET http://localhost:3000/reportify/combo/students \
 
 ---
 
+### 7. Get Classes Combo
+
+Mendapatkan daftar kelas dengan format "Level Major Rombel" (contoh: "X RPL 1", "XII TKJ 2").
+
+**Endpoint:** `GET /combo/classes`
+
+**Response Example:**
+```json
+{
+  "data": [
+    { "value": 1, "label": "X RPL 1" },
+    { "value": 2, "label": "X RPL 2" },
+    { "value": 3, "label": "XI TKJ 1" },
+    { "value": 4, "label": "XII MM 1" }
+  ],
+  "message": "success",
+  "status": true
+}
+```
+
+**Format Label:**
+- Menggunakan `level.name` (X, XI, XII)
+- Menggunakan `major.code` (RPL, TKJ, MM)
+- Menggunakan `rombel.name` (1, 2, 3)
+- Format: `{level.name} {major.code} {rombel.name}`
+
+**cURL Example:**
+```bash
+curl -X GET http://localhost:3000/reportify/combo/classes \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
 ## Data Sorting
 
 Semua data diurutkan berdasarkan `name` secara ascending (A-Z), kecuali untuk roles yang static.
@@ -297,6 +331,9 @@ curl http://localhost:3000/reportify/combo/teachers
 
 # Test students
 curl http://localhost:3000/reportify/combo/students
+
+# Test classes
+curl http://localhost:3000/reportify/combo/classes
 ```
 
 ---
@@ -332,6 +369,14 @@ role ENUM('admin', 'teacher')
 ```sql
 id INT PRIMARY KEY
 name VARCHAR
+```
+
+### classes
+```sql
+id INT PRIMARY KEY
+id_level INT FOREIGN KEY
+id_major INT FOREIGN KEY
+id_rombel INT FOREIGN KEY
 ```
 
 ---

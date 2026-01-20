@@ -6,6 +6,9 @@ const Validator = require('../utils/validator');
  * Query params:
  * - search: string (search by name or nis)
  * - id_class: number (filter by class)
+ * - level: number (filter by level)
+ * - major: number (filter by major)
+ * - rombel: number (filter by rombel)
  * - sortBy: string (name | nis | created_at)
  * - order: string (asc | desc)
  * - page: number (default: 1)
@@ -15,8 +18,8 @@ const getAllStudents = async (req, res) => {
   try {
     // Validate query parameters
     const queryParams = Validator.validateQueryParams(req.query, {
-      sortFields: ['name', 'nis', 'created_at'],
-      filterFields: ['id_class']
+      sortFields: ['name', 'nis', 'created_at', 'id_class'],
+      filterFields: ['id_class', 'level', 'major', 'rombel']
     });
 
     const result = await StudentService.getStudents(queryParams);

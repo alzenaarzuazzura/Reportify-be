@@ -22,7 +22,7 @@ class StudentService {
     // Define searchable fields
     const searchFields = ['name', 'nis'];
 
-    // Build query
+    // Build base query
     const query = QueryBuilder.buildQuery({
       search,
       searchFields,
@@ -34,6 +34,22 @@ class StudentService {
       limit,
       maxLimit: 100
     });
+
+    // Add nested filters untuk level, major, rombel
+    if (filters.level || filters.major || filters.rombel) {
+      query.where = query.where || {};
+      query.where.class = {};
+      
+      if (filters.level) {
+        query.where.class.id_level = parseInt(filters.level);
+      }
+      if (filters.major) {
+        query.where.class.id_major = parseInt(filters.major);
+      }
+      if (filters.rombel) {
+        query.where.class.id_rombel = parseInt(filters.rombel);
+      }
+    }
 
     // Execute query dengan include relations
     const [students, total] = await Promise.all([
@@ -52,7 +68,16 @@ class StudentService {
       prisma.students.count({ where: query.where })
     ]);
 
-    return QueryBuilder.formatResponse(students, total, page, limit);
+    // Transform data untuk frontend
+    const transformedStudents = students.map(student => ({
+      ...student,
+      id_class: {
+        value: student.class.id,
+        label: `${student.class.level.name} ${student.class.major.code} ${student.class.rombel.name}`
+      }
+    }));
+
+    return QueryBuilder.formatResponse(transformedStudents, total, page, limit);
   }
 
   /**
@@ -78,7 +103,14 @@ class StudentService {
       throw new Error('Siswa tidak ditemukan');
     }
 
-    return student;
+    // Transform data untuk frontend
+    return {
+      ...student,
+      id_class: {
+        value: student.class.id,
+        label: `${student.class.level.name} ${student.class.major.code} ${student.class.rombel.name}`
+      }
+    };
   }
 
   /**
@@ -117,7 +149,14 @@ class StudentService {
       }
     });
 
-    return student;
+    // Transform data untuk frontend
+    return {
+      ...student,
+      id_class: {
+        value: student.class.id,
+        label: `${student.class.level.name} ${student.class.major.code} ${student.class.rombel.name}`
+      }
+    };
   }
 
   /**
@@ -166,7 +205,14 @@ class StudentService {
       }
     });
 
-    return student;
+    // Transform data untuk frontend
+    return {
+      ...student,
+      id_class: {
+        value: student.class.id,
+        label: `${student.class.level.name} ${student.class.major.code} ${student.class.rombel.name}`
+      }
+    };
   }
 
   /**
