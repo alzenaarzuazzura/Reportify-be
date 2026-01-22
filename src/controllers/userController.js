@@ -26,7 +26,7 @@ const getAllUsers = async (req, res) => {
     }
 
     // Build orderBy clause - support both sortBy/order and order/sort patterns
-    const validSortFields = ['id', 'name', 'email', 'telephone', 'role', 'created_at'];
+    const validSortFields = ['id', 'name', 'email', 'phone', 'role', 'created_at'];
     const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'id');
     const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
 
@@ -110,12 +110,12 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, email, telephone, password, role } = req.body;
+    const { name, email, phone, password, role } = req.body;
 
     // Validasi input (password optional, akan di-generate jika tidak ada)
-    if (!name || !email || !telephone || !role) {
+    if (!name || !email || !phone || !role) {
       return res.status(400).json(
-        errorResponse('Nama, email, telephone, dan role wajib diisi')
+        errorResponse('Nama, email, phone, dan role wajib diisi')
       );
     }
 
@@ -152,7 +152,7 @@ const createUser = async (req, res) => {
       data: {
         name,
         email,
-        telephone,
+        phone,
         password: hashedPassword,
         role: roleEnum
       },
@@ -180,7 +180,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, telephone, password, role } = req.body;
+    const { name, email, phone, password, role } = req.body;
 
     // Cek user exists
     const existingUser = await prisma.users.findUnique({
@@ -209,7 +209,7 @@ const updateUser = async (req, res) => {
     const updateData = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    if (telephone) updateData.telephone = telephone;
+    if (phone) updateData.phone = phone;
     
     // Convert role from integer to enum string if needed
     if (role !== undefined) {
