@@ -12,8 +12,8 @@ class StudentService {
   static async getStudents(queryParams) {
     const {
       search,
-      sortBy,
-      order,
+      order,  // field name
+      sort,   // asc/desc
       page,
       limit,
       filters
@@ -26,19 +26,26 @@ class StudentService {
     const query = QueryBuilder.buildQuery({
       search,
       searchFields,
-      filters,
-      sortBy,
+      filters: {}, // Don't pass filters directly, we'll handle them manually
       order,
+      sort,
       defaultSort: 'created_at',
       page,
       limit,
       maxLimit: 100
     });
 
+    // Initialize where clause
+    query.where = query.where || {};
+
+    // Handle id_class filter directly
+    if (filters.id_class) {
+      query.where.id_class = parseInt(filters.id_class);
+    }
+
     // Add nested filters untuk level, major, rombel
     if (filters.level || filters.major || filters.rombel) {
-      query.where = query.where || {};
-      query.where.class = {};
+      query.where.class = query.where.class || {};
       
       if (filters.level) {
         query.where.class.id_level = parseInt(filters.level);

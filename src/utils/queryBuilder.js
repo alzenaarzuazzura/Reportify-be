@@ -58,19 +58,19 @@ class QueryBuilder {
 
   /**
    * Build orderBy clause untuk sorting
-   * @param {string} sortBy - Field to sort by
-   * @param {string} order - Sort order (asc | desc)
+   * @param {string} order - Field to sort by (field name)
+   * @param {string} sort - Sort direction (asc | desc)
    * @param {string} defaultSort - Default sort field
    * @returns {Object} Prisma orderBy clause
    */
-  static buildSortQuery(sortBy, order = 'asc', defaultSort = 'id') {
-    const validOrders = ['asc', 'desc'];
-    const sortOrder = validOrders.includes(order?.toLowerCase()) 
-      ? order.toLowerCase() 
+  static buildSortQuery(order, sort = 'asc', defaultSort = 'id') {
+    const validSorts = ['asc', 'desc'];
+    const sortDirection = validSorts.includes(sort?.toLowerCase()) 
+      ? sort.toLowerCase() 
       : 'asc';
 
     return {
-      [sortBy || defaultSort]: sortOrder
+      [order || defaultSort]: sortDirection
     };
   }
 
@@ -104,8 +104,8 @@ class QueryBuilder {
       search,
       searchFields = [],
       filters = {},
-      sortBy,
-      order,
+      order,      // field name
+      sort,       // asc/desc
       defaultSort,
       page,
       limit,
@@ -114,7 +114,7 @@ class QueryBuilder {
 
     const searchQuery = this.buildSearchQuery(search, searchFields);
     const filterQuery = this.buildFilterQuery(filters);
-    const sortQuery = this.buildSortQuery(sortBy, order, defaultSort);
+    const sortQuery = this.buildSortQuery(order, sort, defaultSort);
     const pagination = this.buildPagination(page, limit, maxLimit);
 
     // Combine search and filter

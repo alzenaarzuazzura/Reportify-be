@@ -9,8 +9,8 @@ const Validator = require('../utils/validator');
  * - level: number (filter by level)
  * - major: number (filter by major)
  * - rombel: number (filter by rombel)
- * - sortBy: string (name | nis | created_at)
- * - order: string (asc | desc)
+ * - order: string (field name: name | nis | created_at | id_class)
+ * - sort: string (direction: asc | desc)
  * - page: number (default: 1)
  * - limit: number (default: 10, max: 100)
  */
@@ -27,7 +27,7 @@ const getAllStudents = async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan', 
       error: error.message 
     });
@@ -40,13 +40,13 @@ const getStudentById = async (req, res) => {
     const student = await StudentService.getStudentById(id);
 
     res.json({
-      success: true,
+      status: true,
       data: student
     });
   } catch (error) {
     const statusCode = error.message === 'Siswa tidak ditemukan' ? 404 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -57,14 +57,14 @@ const createStudent = async (req, res) => {
     const student = await StudentService.createStudent(req.body);
 
     res.status(201).json({
-      success: true,
+      status: true,
       message: 'Siswa berhasil dibuat',
       data: student
     });
   } catch (error) {
     const statusCode = error.message === 'NIS sudah terdaftar' ? 400 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -76,7 +76,7 @@ const updateStudent = async (req, res) => {
     const student = await StudentService.updateStudent(id, req.body);
 
     res.json({
-      success: true,
+      status: true,
       message: 'Siswa berhasil diupdate',
       data: student
     });
@@ -84,7 +84,7 @@ const updateStudent = async (req, res) => {
     const statusCode = error.message.includes('tidak ditemukan') ? 404 : 
                        error.message.includes('sudah terdaftar') ? 400 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -96,13 +96,13 @@ const deleteStudent = async (req, res) => {
     const result = await StudentService.deleteStudent(id);
 
     res.json({
-      success: true,
+      status: true,
       ...result
     });
   } catch (error) {
     const statusCode = error.message === 'Siswa tidak ditemukan' ? 404 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }

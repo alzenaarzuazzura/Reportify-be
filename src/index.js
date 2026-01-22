@@ -18,6 +18,8 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const announcementRoutes = require('./routes/announcementRoutes');
 const comboRoutes = require('./routes/comboRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +41,8 @@ app.use('/reportify/attendances', attendanceRoutes);
 app.use('/reportify/assignments', assignmentRoutes);
 app.use('/reportify/announcements', announcementRoutes);
 app.use('/reportify/combo', comboRoutes);
+app.use('/reportify/reports', reportRoutes);
+app.use('/reportify/profile', profileRoutes);
 
 // Cron job untuk mengirim notifikasi setelah jam pelajaran selesai
 cron.schedule('*/5 * * * *', async () => {

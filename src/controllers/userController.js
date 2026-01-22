@@ -16,7 +16,7 @@ const getAllUsers = async (req, res) => {
       where.OR = [
         { name: { contains: search } },
         { email: { contains: search } },
-        { telephone: { contains: search } },
+        { phone: { contains: search } },
       ];
     }
 
@@ -50,7 +50,7 @@ const getAllUsers = async (req, res) => {
         id: true,
         name: true,
         email: true,
-        telephone: true,
+        phone: true,
         role: true,
         created_at: true
       }
@@ -85,7 +85,7 @@ const getUserById = async (req, res) => {
         id: true,
         name: true,
         email: true,
-        telephone: true,
+        phone: true,
         role: true,
         created_at: true
       }
@@ -112,10 +112,10 @@ const createUser = async (req, res) => {
   try {
     const { name, email, telephone, password, role } = req.body;
 
-    // Validasi input
-    if (!name || !email || !telephone || !password || !role) {
+    // Validasi input (password optional, akan di-generate jika tidak ada)
+    if (!name || !email || !telephone || !role) {
       return res.status(400).json(
-        errorResponse('Semua field wajib diisi')
+        errorResponse('Nama, email, telephone, dan role wajib diisi')
       );
     }
 
@@ -130,7 +130,23 @@ const createUser = async (req, res) => {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Generate random password jika tidak disediakan
+    const finalPassword = password || Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '123!';
+    const hashedPassword = await bcrypt.hash(finalPassword, 10);
+
+    // Convert role from integer to enum string if needed
+    let roleEnum = role;
+    if (typeof role === 'number') {
+      // Map integer to enum: 1 = admin, 2 = teacher
+      roleEnum = role === 1 ? 'admin' : 'teacher';
+    } else if (typeof role === 'string') {
+      // Validate it's a valid enum
+      if (!['admin', 'teacher'].includes(role)) {
+        return res.status(400).json(
+          errorResponse('Role tidak valid. Harus admin atau teacher')
+        );
+      }
+    }
 
     const user = await prisma.users.create({
       data: {
@@ -138,13 +154,13 @@ const createUser = async (req, res) => {
         email,
         telephone,
         password: hashedPassword,
-        role
+        role: roleEnum
       },
       select: {
         id: true,
         name: true,
         email: true,
-        telephone: true,
+        phone: true,
         role: true,
         created_at: true
       }
@@ -194,7 +210,19 @@ const updateUser = async (req, res) => {
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (telephone) updateData.telephone = telephone;
-    if (role) updateData.role = role;
+    
+    // Convert role from integer to enum string if needed
+    if (role !== undefined) {
+      if (typeof role === 'number') {
+        // Map integer to enum: 1 = admin, 2 = teacher
+        updateData.role = role === 1 ? 'admin' : 'teacher';
+      } else if (typeof role === 'string') {
+        // Already a string, validate it's a valid enum
+        if (['admin', 'teacher'].includes(role)) {
+          updateData.role = role;
+        }
+      }
+    }
     
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
@@ -207,7 +235,7 @@ const updateUser = async (req, res) => {
         id: true,
         name: true,
         email: true,
-        telephone: true,
+        phone: true,
         role: true,
         created_at: true
       }

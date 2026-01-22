@@ -12,21 +12,21 @@ class Validator {
   static validateQueryParams(query, allowedFields = {}) {
     const {
       search,
-      sortBy,
-      order,
+      order,  // field name (was sortBy)
+      sort,   // asc/desc (was order)
       page,
       limit,
       ...filters
     } = query;
 
-    // Validate sortBy
-    const validatedSortBy = allowedFields.sortFields?.includes(sortBy)
-      ? sortBy
+    // Validate order (field name)
+    const validatedOrder = allowedFields.sortFields?.includes(order)
+      ? order
       : undefined;
 
-    // Validate order
-    const validatedOrder = ['asc', 'desc'].includes(order?.toLowerCase())
-      ? order.toLowerCase()
+    // Validate sort (direction)
+    const validatedSort = ['asc', 'desc'].includes(sort?.toLowerCase())
+      ? sort.toLowerCase()
       : 'asc';
 
     // Validate page and limit
@@ -45,8 +45,8 @@ class Validator {
 
     return {
       search: search?.trim(),
-      sortBy: validatedSortBy,
-      order: validatedOrder,
+      order: validatedOrder,      // field name
+      sort: validatedSort,         // asc/desc
       page: validatedPage,
       limit: validatedLimit,
       filters: validatedFilters
