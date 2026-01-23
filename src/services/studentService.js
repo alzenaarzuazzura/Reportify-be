@@ -27,9 +27,9 @@ class StudentService {
       search,
       searchFields,
       filters: {}, // Don't pass filters directly, we'll handle them manually
-      order,
-      sort,
-      defaultSort: 'created_at',
+      order: order || 'nis',
+      sort: sort || 'asc',
+      defaultSort: 'nis',
       page,
       limit,
       maxLimit: 100
