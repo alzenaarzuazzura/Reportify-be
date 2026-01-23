@@ -225,6 +225,23 @@ class AttendanceService {
 
     return { message: 'Absensi berhasil dihapus' };
   }
+
+  /**
+   * Check if attendance exists for a specific schedule and date
+   * @param {number} idSchedule - Schedule ID
+   * @param {string} date - Date in YYYY-MM-DD format
+   * @returns {boolean} True if attendance exists
+   */
+  static async checkAttendanceExists(idSchedule, date) {
+    const count = await prisma.attendances.count({
+      where: {
+        id_schedule: parseInt(idSchedule),
+        date: new Date(date)
+      }
+    });
+
+    return count > 0;
+  }
 }
 
 module.exports = AttendanceService;

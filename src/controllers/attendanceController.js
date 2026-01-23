@@ -141,11 +141,55 @@ const deleteAttendance = async (req, res) => {
   }
 };
 
+/**
+ * Check if attendance exists for a specific schedule and date
+ * Query params:
+ * - id_schedule: number (required)
+ * - date: YYYY-MM-DD (required)
+ */
+const checkAttendance = async (req, res) => {
+  try {
+    const { id_schedule, date } = req.query;
+
+    // Validation
+    if (!id_schedule || !date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter id_schedule dan date wajib diisi'
+      });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    if (!Validator.isValidDate(date)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format date harus YYYY-MM-DD'
+      });
+    }
+
+    const exists = await AttendanceService.checkAttendanceExists(
+      parseInt(id_schedule),
+      date
+    );
+
+    res.json({
+      success: true,
+      exists
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAllAttendances,
   getAttendanceById,
   createAttendance,
   createBulkAttendance,
   updateAttendance,
-  deleteAttendance
+  deleteAttendance,
+  checkAttendance
 };

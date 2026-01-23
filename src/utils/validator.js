@@ -69,6 +69,23 @@ class Validator {
   }
 
   /**
+   * Validate date format (YYYY-MM-DD)
+   * @param {string} date - Date string
+   * @returns {boolean} Is valid
+   */
+  static isValidDate(date) {
+    if (!date || typeof date !== 'string') return false;
+    
+    // Check format YYYY-MM-DD
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(date)) return false;
+    
+    // Check if it's a valid date
+    const d = new Date(date);
+    return d instanceof Date && !isNaN(d);
+  }
+
+  /**
    * Sanitize string input
    * @param {string} input - Input string
    * @returns {string} Sanitized string

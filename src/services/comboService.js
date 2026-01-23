@@ -231,6 +231,162 @@ const getTeachingAssignments = async () => {
   }));
 };
 
+/**
+ * Get teaching assignments for a specific user (logged in teacher)
+ * Format: "Class - Subject"
+ * @param {number} userId - ID of the logged in user
+ * @returns {Promise<Array>} Array of {value, label}
+ */
+const getTeachingAssignmentsByUser = async (userId) => {
+  const assignments = await prisma.teaching_assignments.findMany({
+    where: {
+      id_user: userId,
+    },
+    select: {
+      id: true,
+      class: {
+        select: {
+          level: {
+            select: {
+              name: true,
+            },
+          },
+          major: {
+            select: {
+              code: true,
+            },
+          },
+          rombel: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      subject: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: [
+      { id_class: 'asc' },
+      { id_subject: 'asc' },
+    ],
+  });
+
+  return assignments.map((assignment) => ({
+    value: assignment.id,
+    label: `${assignment.class.level.name} ${assignment.class.major.code} ${assignment.class.rombel.name} - ${assignment.subject.name}`,
+  }));
+};
+
+/**
+ * Get current schedule for logged in teacher
+ * Returns schedule that is currently ongoing based on day and time
+ * @param {number} userId - ID of the logged in user
+ * @returns {Promise<Array>} Array of current schedules
+ */
+const getCurrentSchedule = async (userId) => {
+  // Get current day and time
+  const now = new Date();
+  const days = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+  const currentDay = days[now.getDay()];
+  const currentTime = now.toTimeString().slice(0, 8); // Format HH:MM:SS
+
+  console.log('=== DEBUG getCurrentSchedule ===');
+  console.log('Current Day:', currentDay);
+  console.log('Current Time:', currentTime);
+  console.log('User ID:', userId);
+
+  // Get all schedules for this teacher on current day
+  const schedules = await prisma.schedules.findMany({
+    where: {
+      day: currentDay,
+      teaching_assignment: {
+        id_user: userId,
+      },
+    },
+    select: {
+      id: true,
+      day: true,
+      start_time: true,
+      end_time: true,
+      room: true,
+      id_teaching_assignment: true,
+      teaching_assignment: {
+        select: {
+          id_class: true,
+          subject: {
+            select: {
+              name: true,
+            },
+          },
+          class: {
+            select: {
+              level: {
+                select: {
+                  name: true,
+                },
+              },
+              major: {
+                select: {
+                  code: true,
+                },
+              },
+              rombel: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  console.log('Schedules found:', schedules.length);
+  schedules.forEach((s, i) => {
+    console.log(`Schedule ${i + 1}:`, {
+      id: s.id,
+      start: s.start_time,
+      end: s.end_time,
+      day: s.day
+    });
+  });
+
+  // Filter schedules that are currently ongoing
+  const currentSchedules = schedules.filter((schedule) => {
+    // Normalize time format (ensure HH:MM:SS)
+    const startTime = schedule.start_time.length === 5 ? schedule.start_time + ':00' : schedule.start_time;
+    const endTime = schedule.end_time.length === 5 ? schedule.end_time + ':00' : schedule.end_time;
+    
+    const isOngoing = currentTime >= startTime && currentTime <= endTime;
+    console.log(`Checking schedule ${schedule.id}: ${startTime} <= ${currentTime} <= ${endTime} = ${isOngoing}`);
+    
+    return isOngoing;
+  });
+
+  // Format the response
+  return currentSchedules.map((schedule) => {
+    const className = `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`;
+    const subjectName = schedule.teaching_assignment.subject.name;
+    
+    return {
+      value: schedule.id,
+      label: `${subjectName} - ${className} (${schedule.start_time}-${schedule.end_time})`,
+      day: schedule.day,
+      time: `${schedule.start_time}-${schedule.end_time}`,
+      class_name: className,
+      subject_name: subjectName,
+      room: schedule.room,
+      id_teaching_assignment: schedule.id_teaching_assignment,
+      id_class: schedule.teaching_assignment.id_class,
+    };
+  });
+};
+
 module.exports = {
   getLevels,
   getMajors,
@@ -240,5 +396,7 @@ module.exports = {
   getStudents,
   getSubjects,
   getClasses,
-  getTeachingAssignments
+  getTeachingAssignments,
+  getTeachingAssignmentsByUser,
+  getCurrentSchedule
 };

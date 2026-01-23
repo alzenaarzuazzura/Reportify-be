@@ -6,6 +6,7 @@ const { authenticate, authorizeTeacher } = require('../middleware/authMiddleware
 router.use(authenticate);
 router.use(authorizeTeacher);
 
+router.get('/check', attendanceController.checkAttendance);
 router.get('/', attendanceController.getAllAttendances);
 router.get('/:id', attendanceController.getAttendanceById);
 router.post('/', attendanceController.createAttendance);
