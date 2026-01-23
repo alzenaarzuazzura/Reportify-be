@@ -8,7 +8,10 @@ router.use(authorizeTeacher);
 
 router.get('/', assignmentController.getAllAssignments);
 router.get('/:id', assignmentController.getAssignmentById);
+router.get('/:id/completion-status', assignmentController.getStudentCompletionStatus);
+router.get('/:id/missing-students', assignmentController.getMissingStudents);
 router.post('/', assignmentController.createAssignment);
+router.post('/:id/generate-students', assignmentController.generateStudentAssignments);
 router.put('/:id', assignmentController.updateAssignment);
 router.delete('/:id', assignmentController.deleteAssignment);
 router.put('/student-assignments/:id', assignmentController.updateStudentAssignment);

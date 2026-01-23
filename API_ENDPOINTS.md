@@ -252,7 +252,10 @@
 |--------|----------|-------------|--------|
 | GET | `/reportify/assignments` | Get all assignments | Teacher/Admin |
 | GET | `/reportify/assignments/:id` | Get assignment by ID | Teacher/Admin |
+| GET | `/reportify/assignments/:id/completion-status` | Get student completion status (sudah/belum mengerjakan) | Teacher/Admin |
+| GET | `/reportify/assignments/:id/missing-students` | Get students without student_assignments (belum di-generate) | Teacher/Admin |
 | POST | `/reportify/assignments` | Create new assignment | Teacher/Admin |
+| POST | `/reportify/assignments/:id/generate-students` | Generate student_assignments for existing assignment | Teacher/Admin |
 | PUT | `/reportify/assignments/:id` | Update assignment | Teacher/Admin |
 | DELETE | `/reportify/assignments/:id` | Delete assignment | Teacher/Admin |
 | PUT | `/reportify/assignments/student-assignments/:id` | Update student assignment status | Teacher/Admin |
@@ -268,11 +271,84 @@
 }
 ```
 
+**Generate Student Assignments Request Body:**
+```json
+{
+  "student_ids": [1, 2, 3, 4, 5]
+}
+```
+_Note: If `student_ids` is empty or not provided, it will generate for all students in the class._
+
+**Get Student Completion Status Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total": 30,
+    "completed_count": 20,
+    "not_completed_count": 10,
+    "completed_students": [
+      {
+        "id": 1,
+        "student_id": 5,
+        "student_name": "Ahmad",
+        "nis": "12345",
+        "completed_at": "2026-01-23T10:00:00.000Z",
+        "note": "Sudah mengumpulkan"
+      }
+    ],
+    "not_completed_students": [
+      {
+        "id": 2,
+        "student_id": 6,
+        "student_name": "Budi",
+        "nis": "12346"
+      }
+    ]
+  }
+}
+```
+
+**Get Missing Students Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_students": 30,
+    "generated": 25,
+    "missing": 5,
+    "missing_students": [
+      {
+        "id": 26,
+        "name": "Student Name",
+        "nis": "12345"
+      }
+    ]
+  }
+}
+```
+
 **Update Student Assignment Request Body:**
 ```json
 {
   "status": true,
   "note": "Sudah dikerjakan dengan baik"
+}
+```
+
+**Update Student Assignment Response:**
+```json
+{
+  "success": true,
+  "message": "Student assignment berhasil diupdate",
+  "data": {
+    "id": 1,
+    "id_student": 1,
+    "id_assignment": 2,
+    "status": true,
+    "completed_at": "2026-01-23T10:30:00.000Z",
+    "note": "Sudah dikerjakan dengan baik"
+  }
 }
 ```
 
