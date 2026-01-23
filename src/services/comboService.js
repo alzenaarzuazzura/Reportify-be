@@ -123,10 +123,14 @@ const getTeachers = async () => {
 
 /**
  * Get all students for combo select
+ * @param {number} idClass - Optional class ID to filter students
  * @returns {Promise<Array>} Array of {value, label}
  */
-const getStudents = async () => {
+const getStudents = async (idClass = null) => {
+  const whereClause = idClass ? { id_class: parseInt(idClass) } : {};
+  
   const students = await prisma.students.findMany({
+    where: whereClause,
     select: {
       id: true,
       name: true,

@@ -140,11 +140,12 @@ const getTeachersCombo = async (req, res) => {
 
 /**
  * Get students combo
- * @route GET /combo/students
+ * @route GET /combo/students?id_class=8
  */
 const getStudentsCombo = async (req, res) => {
   try {
-    const data = await comboService.getStudents();
+    const { id_class } = req.query;
+    const data = await comboService.getStudents(id_class);
     
     return res.status(200).json({
       data,

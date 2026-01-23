@@ -103,6 +103,7 @@ model schedules {
   start_time             String               @db.VarChar(10)
   end_time               String               @db.VarChar(10)
   room                   String               @db.VarChar(50)
+  notification_sent_date DateTime?            @db.Date
   attendances            attendances[]
   teaching_assignment    teaching_assignments @relation(fields: [id_teaching_assignment], references: [id], onDelete: Cascade)
 
