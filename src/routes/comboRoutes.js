@@ -70,13 +70,6 @@ router.get('/classes', comboController.getClassesCombo);
 router.get('/teaching-assignments', comboController.getTeachingAssignmentsCombo);
 
 /**
- * @route   GET /combo/my-teaching-assignments
- * @desc    Get teaching assignments for logged in user (teacher)
- * @access  Private
- */
-router.get('/my-teaching-assignments', comboController.getMyTeachingAssignmentsCombo);
-
-/**
  * @route   GET /combo/my-current-schedule
  * @desc    Get current ongoing schedule for logged in user (teacher)
  * @access  Private

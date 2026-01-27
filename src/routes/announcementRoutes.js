@@ -6,6 +6,7 @@ const { authenticate, authorizeTeacher } = require('../middleware/authMiddleware
 router.use(authenticate);
 router.use(authorizeTeacher);
 
+router.get('/my', announcementController.getMyAnnouncements);
 router.get('/', announcementController.getAllAnnouncements);
 router.get('/:id', announcementController.getAnnouncementById);
 router.post('/', announcementController.createAnnouncement);

@@ -5,7 +5,29 @@ const prisma = new PrismaClient();
 
 const getAllMajors = async (req, res) => {
   try {
-    const majors = await prisma.majors.findMany();
+    const { search, sortBy, order, sort } = req.query;
+
+    // Build where clause for search
+    const where = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { code: { contains: search } }
+      ];
+    }
+
+    // Build orderBy clause - support both sortBy/order and order/sort patterns
+    const validSortFields = ['id', 'name', 'code'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'code');
+    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
+
+    const orderBy = { [sortField]: sortOrder };
+
+    const majors = await prisma.majors.findMany({
+      where,
+      orderBy
+    });
+
     return res.status(200).json(
       successResponse('Berhasil mengambil data jurusan', majors)
     );

@@ -13,11 +13,4 @@ router.use(authenticate);
  */
 router.post('/change-password', profileController.changePassword);
 
-/**
- * @route   GET /profile/login-history
- * @desc    Get user login history
- * @access  Private
- */
-router.get('/login-history', profileController.getLoginHistory);
-
 module.exports = router;

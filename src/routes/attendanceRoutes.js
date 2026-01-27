@@ -7,6 +7,8 @@ router.use(authenticate);
 router.use(authorizeTeacher);
 
 router.get('/check', attendanceController.checkAttendance);
+router.get('/session-summary', attendanceController.getClassSessionSummary);
+router.post('/send-report', attendanceController.sendReportToParents);
 router.get('/', attendanceController.getAllAttendances);
 router.get('/:id', attendanceController.getAttendanceById);
 router.post('/', attendanceController.createAttendance);

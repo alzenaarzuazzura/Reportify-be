@@ -209,30 +209,6 @@ const getTeachingAssignmentsCombo = async (req, res) => {
 };
 
 /**
- * Get teaching assignments combo for logged in user
- * @route GET /combo/my-teaching-assignments
- */
-const getMyTeachingAssignmentsCombo = async (req, res) => {
-  try {
-    const userId = req.user.id; // dari middleware authenticate
-    const data = await comboService.getTeachingAssignmentsByUser(userId);
-    
-    return res.status(200).json({
-      data,
-      message: 'success',
-      status: true,
-    });
-  } catch (error) {
-    console.error('Error getMyTeachingAssignmentsCombo:', error);
-    return res.status(500).json({
-      data: [],
-      message: 'failed',
-      status: false,
-    });
-  }
-};
-
-/**
  * Get current schedule for logged in user
  * @route GET /combo/my-current-schedule
  */
@@ -266,6 +242,5 @@ module.exports = {
   getSubjectsCombo,
   getClassesCombo,
   getTeachingAssignmentsCombo,
-  getMyTeachingAssignmentsCombo,
   getCurrentScheduleCombo
 };

@@ -236,56 +236,6 @@ const getTeachingAssignments = async () => {
 };
 
 /**
- * Get teaching assignments for a specific user (logged in teacher)
- * Format: "Class - Subject"
- * @param {number} userId - ID of the logged in user
- * @returns {Promise<Array>} Array of {value, label}
- */
-const getTeachingAssignmentsByUser = async (userId) => {
-  const assignments = await prisma.teaching_assignments.findMany({
-    where: {
-      id_user: userId,
-    },
-    select: {
-      id: true,
-      class: {
-        select: {
-          level: {
-            select: {
-              name: true,
-            },
-          },
-          major: {
-            select: {
-              code: true,
-            },
-          },
-          rombel: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-      subject: {
-        select: {
-          name: true,
-        },
-      },
-    },
-    orderBy: [
-      { id_class: 'asc' },
-      { id_subject: 'asc' },
-    ],
-  });
-
-  return assignments.map((assignment) => ({
-    value: assignment.id,
-    label: `${assignment.class.level.name} ${assignment.class.major.code} ${assignment.class.rombel.name} - ${assignment.subject.name}`,
-  }));
-};
-
-/**
  * Get current schedule for logged in teacher
  * Returns schedule that is currently ongoing based on day and time
  * @param {number} userId - ID of the logged in user
@@ -302,6 +252,15 @@ const getCurrentSchedule = async (userId) => {
   console.log('Current Day:', currentDay);
   console.log('Current Time:', currentTime);
   console.log('User ID:', userId);
+
+  // Valid days in database enum (only weekdays)
+  const validDays = ['senin', 'selasa', 'rabu', 'kamis', 'jumat'];
+  
+  // If weekend (sabtu/minggu), return empty array
+  if (!validDays.includes(currentDay)) {
+    console.log('⚠️ Weekend detected, no schedules available');
+    return [];
+  }
 
   // Get all schedules for this teacher on current day
   const schedules = await prisma.schedules.findMany({
@@ -401,6 +360,5 @@ module.exports = {
   getSubjects,
   getClasses,
   getTeachingAssignments,
-  getTeachingAssignmentsByUser,
   getCurrentSchedule
 };

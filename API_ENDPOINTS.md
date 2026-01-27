@@ -24,16 +24,23 @@
 | POST | `/reportify/users` | Create new user | Admin |
 | PUT | `/reportify/users/:id` | Update user | Admin |
 | DELETE | `/reportify/users/:id` | Delete user | Admin |
+| POST | `/reportify/users/:id/send-password-setup` | Send password setup link to teacher | Admin |
 
 **Create/Update User Request Body:**
 ```json
 {
   "name": "John Doe",
   "email": "john@example.com",
+  "phone": "081234567890",
   "password": "password123",
   "role": "teacher"
 }
 ```
+
+**Note:** 
+- When creating a teacher (role: "teacher"), the system will automatically send a WhatsApp message with a password setup link to the provided phone number.
+- The password setup link is valid for 1 hour.
+- Use the `/send-password-setup` endpoint to resend the link if needed.
 
 ---
 

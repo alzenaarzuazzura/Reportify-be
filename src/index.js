@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fileUpload = require('express-fileupload');
 const cron = require('node-cron');
 const { scheduleNotifications } = require('./services/notificationService');
 
@@ -34,6 +35,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(fileUpload({
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
+  abortOnLimit: true,
+  responseOnLimit: 'File terlalu besar. Maksimal 10MB'
+}));
 
 app.use('/reportify/auth', authRoutes);
 app.use('/reportify/users', userRoutes);

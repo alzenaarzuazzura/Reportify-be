@@ -1,5 +1,4 @@
-const ProfileService = require('../services/profileService');
-const bcrypt = require('bcrypt');
+const passwordService = require('../services/passwordService');
 
 /**
  * Change password
@@ -9,70 +8,67 @@ const changePassword = async (req, res) => {
     const userId = req.user.id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    // Validasi input
+    if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        success: false,
-        message: 'Semua field harus diisi'
+        status: false,
+        message: 'Password lama dan password baru wajib diisi'
       });
     }
 
-    if (newPassword !== confirmPassword) {
+    // Validasi confirm password jika ada
+    if (confirmPassword && newPassword !== confirmPassword) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Password baru dan konfirmasi password tidak cocok'
       });
     }
 
-    if (newPassword.length < 6) {
+    // Validasi password minimal 8 karakter
+    if (newPassword.length < 8) {
       return res.status(400).json({
-        success: false,
-        message: 'Password minimal 6 karakter'
+        status: false,
+        message: 'Password baru minimal 8 karakter'
       });
     }
 
-    await ProfileService.changePassword(userId, currentPassword, newPassword);
+    // Validasi password baru tidak sama dengan password lama
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        status: false,
+        message: 'Password baru tidak boleh sama dengan password lama'
+      });
+    }
+
+    // Validasi current password
+    const isCurrentPasswordValid = await passwordService.validateCurrentPassword(
+      userId,
+      currentPassword
+    );
+
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({
+        status: false,
+        message: 'Password lama tidak sesuai'
+      });
+    }
+
+    // Update password using passwordService
+    await passwordService.updatePassword(userId, newPassword, false);
 
     res.json({
-      success: true,
+      status: true,
       message: 'Password berhasil diubah'
     });
   } catch (error) {
     const statusCode = error.message === 'Password lama tidak sesuai' ? 400 : 500;
     res.status(statusCode).json({
-      success: false,
+      status: false,
       message: error.message
-    });
-  }
-};
-
-/**
- * Get login history
- */
-const getLoginHistory = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { page = 1, limit = 10 } = req.query;
-
-    const history = await ProfileService.getLoginHistory(userId, {
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
-
-    res.json({
-      success: true,
-      data: history.data,
-      pagination: history.pagination
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan',
-      error: error.message
     });
   }
 };
 
 module.exports = {
   changePassword,
-  getLoginHistory
 };

@@ -9,6 +9,7 @@ router.use(authorizeAdmin);
 router.get('/', studentController.getAllStudents);
 router.get('/:id', studentController.getStudentById);
 router.post('/', studentController.createStudent);
+router.post('/import', studentController.importFromExcel);
 router.put('/:id', studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
 

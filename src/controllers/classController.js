@@ -35,11 +35,22 @@ const getAllClasses = async (req, res) => {
     }
 
     // Build orderBy clause - support both sortBy/order and order/sort patterns
-    const validSortFields = ['id', 'id_level', 'id_major', 'id_rombel'];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'id');
-    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
-
-    const orderBy = { [sortField]: sortOrder };
+    let orderBy;
+    
+    if (sortBy || order) {
+      // Jika ada sort parameter dari user, gunakan itu
+      const validSortFields = ['id', 'id_level', 'id_major', 'id_rombel'];
+      const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'id_level');
+      const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
+      orderBy = { [sortField]: sortOrder };
+    } else {
+      // Default sorting: Level (X → XI → XII), then Major, then Rombel
+      orderBy = [
+        { level: { name: 'asc' } },  // X, XI, XII (alphabetically)
+        { major: { code: 'asc' } },  // Major code ascending
+        { rombel: { name: 'asc' } }  // Rombel name ascending
+      ];
+    }
 
     // Pagination
     const pageNum = parseInt(page) || 1;

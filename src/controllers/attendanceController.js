@@ -3,6 +3,7 @@ const Validator = require('../utils/validator');
 
 /**
  * Get all attendances dengan search, filter, sort, dan pagination
+ * For teachers: automatically filter by their teaching assignments
  * Query params:
  * - id_student: number (filter by student)
  * - id_teaching_assignment: number (filter by teaching assignment)
@@ -16,11 +17,20 @@ const Validator = require('../utils/validator');
  */
 const getAllAttendances = async (req, res) => {
   try {
+    // Get logged in user
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
     // Validate query parameters
     const queryParams = Validator.validateQueryParams(req.query, {
       sortFields: ['date', 'checked_at', 'status'],
       filterFields: ['id_student', 'id_teaching_assignment', 'id_schedule', 'status', 'date_from', 'date_to']
     });
+
+    // For teachers, add filter by their teaching assignments
+    if (userRole === 'teacher') {
+      queryParams.filters.id_user = userId;
+    }
 
     // Validate date range
     if (queryParams.filters.date_from && queryParams.filters.date_to) {
@@ -184,6 +194,72 @@ const checkAttendance = async (req, res) => {
   }
 };
 
+/**
+ * Get class session summary for sending report to parents
+ * Includes: attendance, assignments, announcements for a specific schedule and date
+ */
+const getClassSessionSummary = async (req, res) => {
+  try {
+    const { id_schedule, date } = req.query;
+
+    if (!id_schedule || !date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter id_schedule dan date wajib diisi'
+      });
+    }
+
+    const summary = await AttendanceService.getClassSessionSummary(
+      parseInt(id_schedule),
+      date
+    );
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+/**
+ * Send class session report to parents via WhatsApp
+ * Body:
+ * - id_schedule: number (required)
+ * - date: YYYY-MM-DD (required)
+ */
+const sendReportToParents = async (req, res) => {
+  try {
+    const { id_schedule, date } = req.body;
+
+    if (!id_schedule || !date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter id_schedule dan date wajib diisi'
+      });
+    }
+
+    const result = await AttendanceService.sendReportToParents(
+      parseInt(id_schedule),
+      date
+    );
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAllAttendances,
   getAttendanceById,
@@ -191,5 +267,7 @@ module.exports = {
   createBulkAttendance,
   updateAttendance,
   deleteAttendance,
-  checkAttendance
+  checkAttendance,
+  getClassSessionSummary,
+  sendReportToParents
 };

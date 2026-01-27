@@ -5,28 +5,35 @@ const prisma = new PrismaClient();
 
 const getAllTeachingAssignments = async (req, res) => {
   try {
-    const { search, teacher, classes, subject, sortBy, order, sort, page, limit } = req.query;
+    const { search, teacher, classes, subject, id_user, id_class, id_subject, sortBy, order, sort, page, limit } = req.query;
 
     const where = {};
 
     if (search) {
       where.OR = [
-        { teacher: { name: { contains: search } } },
-        { classes: { name: { contains: search } } },
+        { user: { name: { contains: search } } },
+        { class: { 
+          OR: [
+            { level: { name: { contains: search } } },
+            { major: { code: { contains: search } } },
+            { rombel: { name: { contains: search } } }
+          ]
+        } },
         { subject: { name: { contains: search } } },
       ];
     }
 
-    if (teacher) {
-      where.id_user = parseInt(teacher)
+    // Support both old and new parameter names
+    if (teacher || id_user) {
+      where.id_user = parseInt(teacher || id_user)
     }
     
-    if (classes) {
-      where.id_class = parseInt(classes)
+    if (classes || id_class) {
+      where.id_class = parseInt(classes || id_class)
     }
     
-    if (subject) {
-      where.id_subject = parseInt(subject)
+    if (subject || id_subject) {
+      where.id_subject = parseInt(subject || id_subject)
     }
 
     const validSortFields = ['id', 'id_user', 'id_class', 'id_subject'];
@@ -48,7 +55,13 @@ const getAllTeachingAssignments = async (req, res) => {
       take: limitNum,
       include: {
         user: true,
-        class: true,
+        class: {
+          include: {
+            level: true,
+            major: true,
+            rombel: true,
+          }
+        },
         subject: true,
       }
     });    
@@ -61,7 +74,7 @@ const getAllTeachingAssignments = async (req, res) => {
       },
       id_class: {
         value: assignmentData.id_class,
-        label: assignmentData.class.name
+        label: `${assignmentData.class.level.name} ${assignmentData.class.major.code} ${assignmentData.class.rombel.name}`
       },
       id_subject: {
         value: assignmentData.id_subject,
@@ -112,7 +125,7 @@ const getTeachingAssignmentById = async (req, res) => {
         select: { 
           id: true,
           level: { select: { name: true } },
-          major: { select: { name: true } },
+          major: { select: { code: true } },
           rombel: { select: { name: true } }
         }
       }),
@@ -124,16 +137,16 @@ const getTeachingAssignmentById = async (req, res) => {
 
     // Format class name
     const formattedClass = classData ? {
-      id: classData.id,
-      name: `${classData.level.name} ${classData.major.name} ${classData.rombel.name}`
+      value: classData.id,
+      label: `${classData.level.name} ${classData.major.code} ${classData.rombel.name}`
     } : null;
 
     // Format response
     const formattedAssignment = {
       id: assignment.id,
-      id_user: user,
+      id_user: user ? { value: user.id, label: user.name } : null,
       id_class: formattedClass,
-      id_subject: subject
+      id_subject: subject ? { value: subject.id, label: subject.name } : null
     };
 
     return res.status(200).json(

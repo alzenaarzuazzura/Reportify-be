@@ -237,6 +237,88 @@ class StudentService {
 
     return { message: 'Siswa berhasil dihapus' };
   }
+
+  /**
+   * Import students from Excel
+   * @param {Array} students - Array of student data
+   * @returns {Object} Import result
+   */
+  static async importStudents(students) {
+    const results = {
+      success: [],
+      failed: [],
+      summary: {
+        total: students.length,
+        success: 0,
+        failed: 0
+      }
+    };
+
+    for (const studentData of students) {
+      try {
+        // Check if NIS already exists
+        const existingStudent = await prisma.students.findUnique({
+          where: { nis: studentData.nis }
+        });
+
+        if (existingStudent) {
+          results.failed.push({
+            nis: studentData.nis,
+            name: studentData.name,
+            reason: 'NIS sudah terdaftar'
+          });
+          results.summary.failed++;
+          continue;
+        }
+
+        // Check if class exists
+        const classExists = await prisma.classes.findUnique({
+          where: { id: studentData.id_class }
+        });
+
+        if (!classExists) {
+          results.failed.push({
+            nis: studentData.nis,
+            name: studentData.name,
+            reason: `Kelas dengan ID ${studentData.id_class} tidak ditemukan`
+          });
+          results.summary.failed++;
+          continue;
+        }
+
+        // Create student
+        const student = await prisma.students.create({
+          data: studentData,
+          include: {
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            }
+          }
+        });
+
+        results.success.push({
+          nis: student.nis,
+          name: student.name,
+          class: `${student.class.level.name} ${student.class.major.code} ${student.class.rombel.name}`
+        });
+        results.summary.success++;
+
+      } catch (error) {
+        results.failed.push({
+          nis: studentData.nis,
+          name: studentData.name,
+          reason: error.message
+        });
+        results.summary.failed++;
+      }
+    }
+
+    return results;
+  }
 }
 
 module.exports = StudentService;

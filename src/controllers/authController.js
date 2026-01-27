@@ -1,8 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { successResponse, errorResponse } = require('../types/apiResponse');
+const resetPasswordService = require('../services/resetPasswordService');
+const passwordService = require('../services/passwordService');
+const whatsappService = require('../services/whatsappService');
+const emailService = require('../services/emailService');
 
 const prisma = new PrismaClient();
 
@@ -76,7 +79,9 @@ const logout = async (req, res) => {
 };
 
 /**
- * Forgot Password - Generate reset token
+ * UNIFIED Forgot Password
+ * Digunakan untuk: Forgot Password & Resend Set Password Link
+ * Flow: WhatsApp (default) → Email (fallback)
  * @route POST /auth/forgot-password
  */
 const forgotPassword = async (req, res) => {
@@ -90,48 +95,77 @@ const forgotPassword = async (req, res) => {
       );
     }
 
-    // Cari user berdasarkan email
-    const user = await prisma.users.findUnique({
-      where: { email }
-    });
+    console.log(`\n=== FORGOT PASSWORD REQUEST ===`);
+    console.log(`Email: ${email}`);
+
+    // Get user by email
+    const user = await resetPasswordService.getUserByEmail(email);
 
     // Selalu return success untuk keamanan (tidak bocorkan email terdaftar atau tidak)
-    // Tapi hanya generate token jika user ditemukan
-    if (user) {
-      // Generate random token (32 bytes = 64 hex characters)
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      
-      // Hash token sebelum disimpan di database
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(resetToken)
-        .digest('hex');
-
-      // Set expired 15 menit dari sekarang
-      const resetTokenExpired = new Date(Date.now() + 15 * 60 * 1000);
-
-      // Update user dengan reset token
-      await prisma.users.update({
-        where: { id: user.id },
-        data: {
-          reset_token: hashedToken,
-          reset_token_expired: resetTokenExpired
-        }
-      });
-
-      // TODO: Kirim email dengan link reset password
-      // Link format: http://localhost:5173/reset-password?token=${resetToken}
-      console.log('Reset token:', resetToken);
-      console.log('Reset link:', `http://localhost:5173/reset-password?token=${resetToken}`);
+    if (!user) {
+      console.log('⚠️ User not found, but returning success for security');
+      return res.status(200).json(
+        successResponse(
+          'Jika email terdaftar, link reset password telah dikirim',
+          null
+        )
+      );
     }
 
-    // Selalu return success message yang sama
-    return res.status(200).json(
-      successResponse(
-        'Jika email terdaftar, link reset password telah dikirim ke email Anda',
-        null
-      )
-    );
+    console.log(`User found: ${user.name} (${user.role})`);
+
+    // Generate reset token & link
+    const { resetLink, expiresAt } = await resetPasswordService.createResetToken(user.id, 60);
+    console.log(`Reset link: ${resetLink}`);
+
+    // Try WhatsApp first (default channel)
+    let deliverySuccess = false;
+    let deliveryChannel = null;
+
+    if (user.phone) {
+      console.log('📱 Attempting WhatsApp delivery...');
+      const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+      
+      if (waResult.success) {
+        deliverySuccess = true;
+        deliveryChannel = 'WhatsApp';
+        console.log('✅ WhatsApp delivery successful');
+      } else {
+        console.log('⚠️ WhatsApp delivery failed, trying email fallback...');
+      }
+    } else {
+      console.log('⚠️ No phone number, skipping WhatsApp');
+    }
+
+    // Fallback to Email if WhatsApp failed or not available
+    if (!deliverySuccess) {
+      console.log('📧 Attempting Email delivery...');
+      const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
+      
+      if (emailResult.success) {
+        deliverySuccess = true;
+        deliveryChannel = 'Email';
+        console.log('✅ Email delivery successful');
+      } else {
+        console.log('❌ Email delivery failed');
+      }
+    }
+
+    // Return response
+    if (deliverySuccess) {
+      return res.status(200).json(
+        successResponse(
+          `Link reset password telah dikirim via ${deliveryChannel}`,
+          { channel: deliveryChannel, expiresAt }
+        )
+      );
+    } else {
+      // Token sudah dibuat tapi gagal kirim
+      console.error('❌ All delivery channels failed');
+      return res.status(500).json(
+        errorResponse('Gagal mengirim link reset password. Silakan hubungi administrator.')
+      );
+    }
   } catch (error) {
     console.error('Error forgot password:', error);
     return res.status(500).json(
@@ -141,7 +175,8 @@ const forgotPassword = async (req, res) => {
 };
 
 /**
- * Reset Password - Verify token and update password
+ * UNIFIED Reset Password
+ * Digunakan untuk: Set Password Pertama Kali & Reset Password
  * @route POST /auth/reset-password
  */
 const resetPassword = async (req, res) => {
@@ -162,40 +197,24 @@ const resetPassword = async (req, res) => {
       );
     }
 
-    // Hash token dari request untuk dicocokkan dengan database
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
+    console.log(`\n=== RESET PASSWORD REQUEST ===`);
 
-    // Cari user dengan token yang valid dan belum expired
-    const user = await prisma.users.findFirst({
-      where: {
-        reset_token: hashedToken,
-        reset_token_expired: {
-          gt: new Date() // greater than now (belum expired)
-        }
-      }
-    });
+    // Verify token
+    const user = await resetPasswordService.verifyResetToken(token);
 
     if (!user) {
+      console.log('❌ Invalid or expired token');
       return res.status(400).json(
         errorResponse('Token tidak valid atau sudah kadaluarsa')
       );
     }
 
-    // Hash password baru
-    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log(`✅ Token valid for user: ${user.name} (${user.email})`);
 
-    // Update password dan hapus reset token
-    await prisma.users.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        reset_token: null,
-        reset_token_expired: null
-      }
-    });
+    // Update password using passwordService (with clearResetToken = true)
+    await passwordService.updatePassword(user.id, password, true);
+
+    console.log(`✅ Password reset successfully for user ${user.id}`);
 
     return res.status(200).json(
       successResponse('Password berhasil diubah', null)
@@ -208,4 +227,69 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { login, logout, forgotPassword, resetPassword };
+/**
+ * Change Password (untuk user yang sudah login)
+ * Requires: JWT authentication
+ * @route POST /auth/change-password
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id; // Dari JWT middleware
+
+    // Validasi input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json(
+        errorResponse('Password lama dan password baru wajib diisi')
+      );
+    }
+
+    // Validasi password baru minimal 8 karakter
+    if (newPassword.length < 8) {
+      return res.status(400).json(
+        errorResponse('Password baru minimal 8 karakter')
+      );
+    }
+
+    // Validasi password baru tidak sama dengan password lama
+    if (currentPassword === newPassword) {
+      return res.status(400).json(
+        errorResponse('Password baru tidak boleh sama dengan password lama')
+      );
+    }
+
+    console.log(`\n=== CHANGE PASSWORD REQUEST ===`);
+    console.log(`User ID: ${userId}`);
+
+    // Validasi current password
+    const isCurrentPasswordValid = await passwordService.validateCurrentPassword(
+      userId,
+      currentPassword
+    );
+
+    if (!isCurrentPasswordValid) {
+      console.log('❌ Current password invalid');
+      return res.status(400).json(
+        errorResponse('Password lama tidak sesuai')
+      );
+    }
+
+    console.log('✅ Current password valid');
+
+    // Update password using passwordService (with clearResetToken = false)
+    await passwordService.updatePassword(userId, newPassword, false);
+
+    console.log(`✅ Password changed successfully for user ${userId}`);
+
+    return res.status(200).json(
+      successResponse('Password berhasil diubah', null)
+    );
+  } catch (error) {
+    console.error('Error change password:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengubah password')
+    );
+  }
+};
+
+module.exports = { login, logout, forgotPassword, resetPassword, changePassword };

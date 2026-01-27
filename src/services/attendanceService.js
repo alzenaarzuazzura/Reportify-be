@@ -19,6 +19,17 @@ class AttendanceService {
       filters
     } = queryParams;
 
+    // Build base where clause
+    const where = {};
+
+    // Filter by user (teacher) - get attendances from their teaching assignments
+    if (filters.id_user) {
+      where.teaching_assignment = {
+        id_user: parseInt(filters.id_user)
+      };
+      delete filters.id_user; // Remove from filters to avoid conflict
+    }
+
     // Build query
     const query = QueryBuilder.buildQuery({
       search,
@@ -31,6 +42,9 @@ class AttendanceService {
       limit,
       maxLimit: 100
     });
+
+    // Merge where clauses
+    query.where = { ...query.where, ...where };
 
     // Execute query dengan include relations
     const [attendances, total] = await Promise.all([
@@ -241,6 +255,227 @@ class AttendanceService {
     });
 
     return count > 0;
+  }
+
+  /**
+   * Get class session summary for a specific schedule and date
+   * Includes: attendance, assignments, announcements
+   * @param {number} idSchedule - Schedule ID
+   * @param {string} date - Date in YYYY-MM-DD format
+   * @returns {Object} Session summary
+   */
+  static async getClassSessionSummary(idSchedule, date) {
+    // Get schedule with teaching assignment details
+    const schedule = await prisma.schedules.findUnique({
+      where: { id: parseInt(idSchedule) },
+      include: {
+        teaching_assignment: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            subject: true,
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!schedule) {
+      throw new Error('Jadwal tidak ditemukan');
+    }
+
+    // Get attendances for this session
+    const attendances = await prisma.attendances.findMany({
+      where: {
+        id_schedule: parseInt(idSchedule),
+        date: new Date(date)
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            nis: true,
+            name: true,
+            parent_telephone: true
+          }
+        }
+      }
+    });
+
+    // Get assignments for this class on this date
+    const assignments = await prisma.assignments.findMany({
+      where: {
+        id_teaching_assignment: schedule.id_teaching_assignment,
+        deadline: {
+          gte: new Date(date),
+          lte: new Date(new Date(date).setHours(23, 59, 59))
+        }
+      },
+      select: {
+        id: true,
+        assignment_title: true,
+        assignment_desc: true,
+        deadline: true
+      }
+    });
+
+    // Get announcements for this class on this date
+    const announcements = await prisma.announcements.findMany({
+      where: {
+        id_teaching_assignment: schedule.id_teaching_assignment,
+        date: new Date(date)
+      },
+      select: {
+        id: true,
+        title: true,
+        desc: true,
+        date: true
+      }
+    });
+
+    // Calculate attendance statistics
+    const totalStudents = attendances.length;
+    const presentCount = attendances.filter(a => a.status === 'hadir').length;
+    const permitCount = attendances.filter(a => a.status === 'izin').length;
+    const absentCount = attendances.filter(a => a.status === 'alfa').length;
+
+    return {
+      schedule: {
+        id: schedule.id,
+        day: schedule.day,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        teacher: schedule.teaching_assignment.user.name,
+        subject: schedule.teaching_assignment.subject.name,
+        class: `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`
+      },
+      date,
+      attendance: {
+        total: totalStudents,
+        present: presentCount,
+        permit: permitCount,
+        absent: absentCount,
+        details: attendances
+      },
+      assignments: assignments.length > 0 ? assignments : null,
+      announcements: announcements.length > 0 ? announcements : null
+    };
+  }
+
+  /**
+   * Send class session report to all parents via WhatsApp
+   * @param {number} idSchedule - Schedule ID
+   * @param {string} date - Date in YYYY-MM-DD format
+   * @returns {Object} Send result
+   */
+  static async sendReportToParents(idSchedule, date) {
+    const whatsappService = require('./whatsappService');
+    
+    // Get session summary
+    const summary = await this.getClassSessionSummary(idSchedule, date);
+
+    // Prepare messages for each parent
+    const sendResults = [];
+    const errors = [];
+
+    for (const attendance of summary.attendance.details) {
+      const student = attendance.student;
+      
+      if (!student.parent_telephone) {
+        errors.push({
+          student: student.name,
+          reason: 'Nomor telepon wali murid tidak tersedia'
+        });
+        continue;
+      }
+
+      // Build message
+      let message = `*LAPORAN KEGIATAN BELAJAR*\n\n`;
+      message += `Yth. Orang Tua/Wali dari *${student.name}*\n\n`;
+      message += `📅 Tanggal: ${new Date(date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+      message += `📚 Mata Pelajaran: ${summary.schedule.subject}\n`;
+      message += `👨‍🏫 Guru: ${summary.schedule.teacher}\n`;
+      message += `🏫 Kelas: ${summary.schedule.class}\n`;
+      message += `⏰ Waktu: ${summary.schedule.start_time} - ${summary.schedule.end_time}\n\n`;
+      
+      // Attendance status
+      message += `*KEHADIRAN*\n`;
+      const statusEmoji = {
+        'hadir': '✅',
+        'izin': '📝',
+        'alfa': '❌'
+      };
+      message += `${statusEmoji[attendance.status]} Status: ${attendance.status.toUpperCase()}\n`;
+      if (attendance.note) {
+        message += `📌 Catatan: ${attendance.note}\n`;
+      }
+      message += `\n`;
+
+      // Assignments
+      if (summary.assignments && summary.assignments.length > 0) {
+        message += `*TUGAS YANG DIBERIKAN*\n`;
+        summary.assignments.forEach((assignment, index) => {
+          message += `${index + 1}. ${assignment.assignment_title}\n`;
+          message += `   📝 ${assignment.assignment_desc}\n`;
+          message += `   ⏰ Deadline: ${new Date(assignment.deadline).toLocaleDateString('id-ID')}\n`;
+        });
+        message += `\n`;
+      }
+
+      // Announcements
+      if (summary.announcements && summary.announcements.length > 0) {
+        message += `*PENGUMUMAN*\n`;
+        summary.announcements.forEach((announcement, index) => {
+          message += `${index + 1}. ${announcement.title}\n`;
+          message += `   ${announcement.desc}\n`;
+        });
+        message += `\n`;
+      }
+
+      message += `Terima kasih atas perhatian dan dukungan Anda.\n\n`;
+      message += `Hormat kami,\n`;
+      message += `${summary.schedule.teacher}\n`;
+      message += `Sekolah Pelita Bangsa`;
+
+      // Send WhatsApp message
+      const result = await whatsappService.sendMessage(student.parent_telephone, message);
+      
+      if (result.success) {
+        sendResults.push({
+          student: student.name,
+          phone: student.parent_telephone,
+          status: 'sent'
+        });
+      } else {
+        errors.push({
+          student: student.name,
+          phone: student.parent_telephone,
+          reason: result.error
+        });
+      }
+    }
+
+    return {
+      message: 'Proses pengiriman laporan selesai',
+      summary: {
+        total: summary.attendance.total,
+        sent: sendResults.length,
+        failed: errors.length
+      },
+      sent: sendResults,
+      errors: errors.length > 0 ? errors : undefined
+    };
   }
 }
 

@@ -4,7 +4,22 @@ const prisma = new PrismaClient();
 
 const getAllAssignments = async (req, res) => {
   try {
+    // Get logged in user
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Build where clause
+    const where = {};
+
+    // For teachers, filter by their teaching assignments
+    if (userRole === 'teacher') {
+      where.teaching_assignment = {
+        id_user: userId
+      };
+    }
+
     const assignments = await prisma.assignments.findMany({
+      where,
       include: {
         teaching_assignment: {
           include: {
@@ -30,6 +45,9 @@ const getAllAssignments = async (req, res) => {
             student: true
           }
         }
+      },
+      orderBy: {
+        created_at: 'desc'
       }
     });
     res.json(assignments);

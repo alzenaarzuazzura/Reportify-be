@@ -2,6 +2,61 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+// Get all announcements for logged-in teacher
+const getMyAnnouncements = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const announcements = await prisma.announcements.findMany({
+      where: {
+        teaching_assignment: {
+          id_user: userId
+        }
+      },
+      include: {
+        teaching_assignment: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            },
+            subject: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+
+    // Transform to match frontend expectations
+    const transformedAnnouncements = announcements.map(announcement => ({
+      id: announcement.id,
+      id_user: announcement.teaching_assignment.id_user,
+      title: announcement.title,
+      content: announcement.desc,
+      announcement_date: announcement.date,
+      created_at: announcement.created_at,
+      updated_at: announcement.created_at,
+      user: announcement.teaching_assignment.user
+    }));
+
+    res.json(transformedAnnouncements);
+  } catch (error) {
+    res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
+  }
+};
+
 const getAllAnnouncements = async (req, res) => {
   try {
     const announcements = await prisma.announcements.findMany({
@@ -68,7 +123,19 @@ const getAnnouncementById = async (req, res) => {
       return res.status(404).json({ message: 'Pengumuman tidak ditemukan' });
     }
 
-    res.json(announcement);
+    // Transform to match frontend expectations
+    const transformedAnnouncement = {
+      id: announcement.id,
+      id_user: announcement.teaching_assignment.id_user,
+      title: announcement.title,
+      content: announcement.desc,
+      announcement_date: announcement.date,
+      created_at: announcement.created_at,
+      updated_at: announcement.created_at,
+      user: announcement.teaching_assignment.user
+    };
+
+    res.json(transformedAnnouncement);
   } catch (error) {
     res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
   }
@@ -76,14 +143,27 @@ const getAnnouncementById = async (req, res) => {
 
 const createAnnouncement = async (req, res) => {
   try {
-    const { id_teaching_assignment, title, desc, date } = req.body;
+    const { title, content, announcement_date } = req.body;
+    const userId = req.user.id;
+
+    // Get first teaching assignment for this teacher
+    // In real scenario, you might want to let teacher select which class
+    const teachingAssignment = await prisma.teaching_assignments.findFirst({
+      where: {
+        id_user: userId
+      }
+    });
+
+    if (!teachingAssignment) {
+      return res.status(400).json({ message: 'Anda belum memiliki kelas yang diajar' });
+    }
 
     const announcement = await prisma.announcements.create({
       data: {
-        id_teaching_assignment,
+        id_teaching_assignment: teachingAssignment.id,
         title,
-        desc,
-        date: new Date(date)
+        desc: content,
+        date: new Date(announcement_date)
       },
       include: {
         teaching_assignment: {
@@ -101,7 +181,19 @@ const createAnnouncement = async (req, res) => {
       }
     });
 
-    res.status(201).json(announcement);
+    // Transform response
+    const transformedAnnouncement = {
+      id: announcement.id,
+      id_user: announcement.teaching_assignment.id_user,
+      title: announcement.title,
+      content: announcement.desc,
+      announcement_date: announcement.date,
+      created_at: announcement.created_at,
+      updated_at: announcement.created_at,
+      user: announcement.teaching_assignment.user
+    };
+
+    res.status(201).json(transformedAnnouncement);
   } catch (error) {
     res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
   }
@@ -110,15 +202,14 @@ const createAnnouncement = async (req, res) => {
 const updateAnnouncement = async (req, res) => {
   try {
     const { id } = req.params;
-    const { id_teaching_assignment, title, desc, date } = req.body;
+    const { title, content, announcement_date } = req.body;
 
     const announcement = await prisma.announcements.update({
       where: { id: parseInt(id) },
       data: {
-        id_teaching_assignment,
         title,
-        desc,
-        date: new Date(date)
+        desc: content,
+        date: new Date(announcement_date)
       },
       include: {
         teaching_assignment: {
@@ -136,7 +227,19 @@ const updateAnnouncement = async (req, res) => {
       }
     });
 
-    res.json(announcement);
+    // Transform response
+    const transformedAnnouncement = {
+      id: announcement.id,
+      id_user: announcement.teaching_assignment.id_user,
+      title: announcement.title,
+      content: announcement.desc,
+      announcement_date: announcement.date,
+      created_at: announcement.created_at,
+      updated_at: announcement.created_at,
+      user: announcement.teaching_assignment.user
+    };
+
+    res.json(transformedAnnouncement);
   } catch (error) {
     res.status(500).json({ message: 'Terjadi kesalahan', error: error.message });
   }
@@ -157,6 +260,7 @@ const deleteAnnouncement = async (req, res) => {
 };
 
 module.exports = {
+  getMyAnnouncements,
   getAllAnnouncements,
   getAnnouncementById,
   createAnnouncement,

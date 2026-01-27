@@ -1,8 +1,221 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
+const xlsx = require('xlsx');
 const { successResponse, errorResponse } = require('../types/apiResponse');
+const resetPasswordService = require('../services/resetPasswordService');
+const whatsappService = require('../services/whatsappService');
+const emailService = require('../services/emailService');
 
 const prisma = new PrismaClient();
+
+const importFromExcel = async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({
+        status: false,
+        message: 'File Excel tidak ditemukan. Harap upload file dengan nama "file"'
+      });
+    }
+
+    const file = req.files.file;
+
+    const allowedExtensions = ['.xlsx', '.xls'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!allowedExtensions.includes(fileExtension)) {
+      return res.status(400).json({
+        status: false,
+        message: 'Format file tidak valid. Harap upload file Excel (.xlsx atau .xls)'
+      });
+    }
+
+    const workbook = xlsx.read(file.data, { type: 'buffer' });
+
+    const sheetName = 'Data Guru';
+    if (!workbook.SheetNames.includes(sheetName)) {
+      return res.status(400).json({
+        status: false,
+        message: `Sheet "${sheetName}" tidak ditemukan. Pastikan nama sheet adalah "Data Guru"`
+      });
+    }
+    
+    const worksheet = workbook.Sheets[sheetName];
+
+    const jsonData = xlsx.utils.sheet_to_json(worksheet);
+
+    if (jsonData.length === 0) {
+      return res.status(400).json({
+        status: false,
+        message: 'File Excel kosong atau tidak ada data'
+      });
+    }
+
+    const requiredColumns = ['NAMA', 'EMAIL', 'TELEPON', 'ROLE'];
+    const allowedRoles = ['admin', 'teacher'];
+    const teachers = [];
+    const errors = [];
+    
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      const rowNumber = i + 2;
+
+      const missingColumns = requiredColumns.filter(col => !row[col]);
+      if (missingColumns.length > 0) {
+        errors.push({
+          row: rowNumber,
+          message: `Kolom wajib tidak lengkap: ${missingColumns.join(', ')}`
+        });
+        continue;
+      }
+
+      if (!row.NAMA || row.NAMA.toString().trim() === '') {
+        errors.push({
+          row: rowNumber,
+          message: 'Nama tidak boleh kosong'
+        });
+        continue;
+      }
+
+      if (!row.EMAIL || row.EMAIL.toString().trim() === '') {
+        errors.push({
+          row: rowNumber,
+          message: 'Email tidak boleh kosong'
+        });
+        continue;
+      }   
+      
+      // Validate role
+      if (!row.ROLE || row.ROLE.toString().trim() === '') {
+        errors.push({
+          row: rowNumber,
+          message: 'Role tidak boleh kosong'
+        });
+        continue;
+      }
+      
+      const roleRaw = row.ROLE.toString().trim().toLowerCase();
+      
+      if (!allowedRoles.includes(roleRaw)) {
+        errors.push({
+          row: rowNumber,
+          message: `Role tidak valid. Hanya boleh: ${allowedRoles.join(', ')}`
+        });
+        continue;
+      }
+
+      teachers.push({
+        name: row.NAMA.toString().trim(),
+        email: row.EMAIL.toString().trim(),
+        phone: row.TELEPON ? row.TELEPON.toString().trim() : null,
+        role: roleRaw
+      });
+    }
+
+    // If there are validation errors, return them
+    if (errors.length > 0) {
+      return res.status(400).json({
+        status: false,
+        message: 'Terdapat kesalahan validasi data',
+        errors: errors,
+        summary: {
+          total: jsonData.length,
+          valid: teachers.length,
+          invalid: errors.length
+        }
+      });
+    }
+
+    // Import teachers
+    const imported = [];
+    const importErrors = [];
+
+    for (const teacher of teachers) {
+      try {
+        // Check if email already exists
+        const existingUser = await prisma.users.findUnique({
+          where: { email: teacher.email }
+        });
+
+        if (existingUser) {
+          importErrors.push({
+            email: teacher.email,
+            message: 'Email sudah terdaftar'
+          });
+          continue;
+        }
+
+        // Generate random password
+        const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '123!';
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        // Create user
+        const user = await prisma.users.create({
+          data: {
+            name: teacher.name,
+            email: teacher.email,
+            phone: teacher.phone,
+            password: hashedPassword,
+            role: teacher.role
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            created_at: true
+          }
+        });
+
+        imported.push(user);
+
+        // Send password setup link for teachers
+        if (teacher.role === 'teacher') {
+          try {
+            const { resetLink } = await resetPasswordService.createResetToken(user.id, 60);
+            
+            // Try WhatsApp first
+            if (user.phone) {
+              await whatsappService.sendResetPasswordLink(user, resetLink);
+            } else {
+              // Fallback to Email
+              await emailService.sendResetPasswordLink(user, resetLink);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Failed to send notification to ${user.name}:`, error.message);
+          }
+        }
+      } catch (error) {
+        importErrors.push({
+          email: teacher.email,
+          message: error.message
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Import data guru berhasil',
+      data: {
+        imported: imported,
+        summary: {
+          total: teachers.length,
+          success: imported.length,
+          failed: importErrors.length
+        },
+        errors: importErrors.length > 0 ? importErrors : undefined
+      }
+    });
+
+  } catch (error) {
+    console.error('Error importing teachers:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Gagal mengimport data guru',
+      error: error.message
+    });
+  }
+};
 
 const getAllUsers = async (req, res) => {
   try {
@@ -113,9 +326,9 @@ const createUser = async (req, res) => {
     const { name, email, phone, password, role } = req.body;
 
     // Validasi input (password optional, akan di-generate jika tidak ada)
-    if (!name || !email || !phone || !role) {
+    if (!name || !email || !role) {
       return res.status(400).json(
-        errorResponse('Nama, email, phone, dan role wajib diisi')
+        errorResponse('Nama, email, dan role wajib diisi')
       );
     }
 
@@ -152,7 +365,7 @@ const createUser = async (req, res) => {
       data: {
         name,
         email,
-        phone,
+        phone: phone || null,
         password: hashedPassword,
         role: roleEnum
       },
@@ -165,6 +378,46 @@ const createUser = async (req, res) => {
         created_at: true
       }
     });
+
+    // Jika user adalah teacher, kirim link set password via WhatsApp/Email
+    if (roleEnum === 'teacher') {
+      console.log(`\n📤 Sending set password link to teacher: ${name}`);
+      
+      try {
+        // Generate reset token & link
+        const { resetLink } = await resetPasswordService.createResetToken(user.id, 60);
+        
+        // Try WhatsApp first
+        let deliverySuccess = false;
+        let deliveryChannel = null;
+        
+        if (phone) {
+          const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+          if (waResult.success) {
+            deliverySuccess = true;
+            deliveryChannel = 'WhatsApp';
+            console.log('✅ WhatsApp notification sent');
+          }
+        }
+        
+        // Fallback to Email
+        if (!deliverySuccess) {
+          const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
+          if (emailResult.success) {
+            deliverySuccess = true;
+            deliveryChannel = 'Email';
+            console.log('✅ Email notification sent');
+          }
+        }
+        
+        if (!deliverySuccess) {
+          console.warn('⚠️ Failed to send notification via all channels');
+        }
+      } catch (error) {
+        console.error('⚠️ Error sending notification:', error.message);
+        // Tidak gagalkan create user, hanya log warning
+      }
+    }
 
     return res.status(201).json(
       successResponse('User berhasil dibuat', user)
@@ -209,7 +462,9 @@ const updateUser = async (req, res) => {
     const updateData = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    if (phone) updateData.phone = phone;
+    if (phone !== undefined) {
+      updateData.phone = phone || null;
+    };
     
     // Convert role from integer to enum string if needed
     if (role !== undefined) {
@@ -282,10 +537,93 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const sendPasswordSetupLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Cek user exists dan role teacher
+    const user = await prisma.users.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json(
+        errorResponse('User tidak ditemukan')
+      );
+    }
+
+    if (user.role !== 'teacher') {
+      return res.status(400).json(
+        errorResponse('Fitur ini hanya untuk teacher')
+      );
+    }
+
+    console.log(`\n📤 Resending set password link to: ${user.name}`);
+
+    // Generate reset token & link
+    const { resetLink, expiresAt } = await resetPasswordService.createResetToken(user.id, 60);
+
+    // Try WhatsApp first
+    let deliverySuccess = false;
+    let deliveryChannel = null;
+
+    if (user.phone) {
+      const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+      if (waResult.success) {
+        deliverySuccess = true;
+        deliveryChannel = 'WhatsApp';
+        console.log('✅ WhatsApp delivery successful');
+      }
+    }
+
+    // Fallback to Email
+    if (!deliverySuccess) {
+      const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
+      if (emailResult.success) {
+        deliverySuccess = true;
+        deliveryChannel = 'Email';
+        console.log('✅ Email delivery successful');
+      }
+    }
+
+    if (deliverySuccess) {
+      return res.status(200).json(
+        successResponse(
+          `Link set password berhasil dikirim via ${deliveryChannel}`,
+          { 
+            teacherId: user.id,
+            teacherName: user.name,
+            channel: deliveryChannel,
+            expiresAt 
+          }
+        )
+      );
+    } else {
+      return res.status(500).json(
+        errorResponse('Gagal mengirim link set password via semua channel')
+      );
+    }
+  } catch (error) {
+    console.error('Error sendPasswordSetupLink:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengirim link set password')
+    );
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  sendPasswordSetupLink,
+  importFromExcel
 };

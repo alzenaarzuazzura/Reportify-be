@@ -5,7 +5,19 @@ const prisma = new PrismaClient();
 
 const getAllLevels = async (req, res) => {
   try {
-    const levels = await prisma.levels.findMany();
+    const { sortBy, order, sort } = req.query;
+
+    // Build orderBy clause - support both sortBy/order and order/sort patterns
+    const validSortFields = ['id', 'name'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : (validSortFields.includes(order) ? order : 'name');
+    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : (order === 'desc' ? 'desc' : 'asc');
+
+    const orderBy = { [sortField]: sortOrder };
+
+    const levels = await prisma.levels.findMany({
+      orderBy
+    });
+
     return res.status(200).json(
       successResponse('Berhasil mengambil data level', levels)
     );

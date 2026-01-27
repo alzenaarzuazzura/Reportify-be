@@ -258,7 +258,7 @@ Demikian informasi yang kami sampaikan.
 Atas perhatian Bapak/Ibu, kami ucapkan terima kasih.
 
 Hormat kami,
-Sekolah Pelita Bangsa`;
+SMKN 2 Surabaya`;
 
         // 5. Kirim WA ke orangtua dan siswa (avoid double send jika nomornya sama)
         console.log(`\n📱 Sending notification for ${student.name}...`);
