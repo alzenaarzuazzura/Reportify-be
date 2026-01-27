@@ -12,8 +12,8 @@ class AttendanceService {
   static async getAttendances(queryParams) {
     const {
       search,
-      sortBy,
       order,
+      sort,
       page,
       limit,
       filters
@@ -35,8 +35,8 @@ class AttendanceService {
       search,
       searchFields: [],
       filters,
-      sortBy,
       order,
+      sort: sort || 'asc',
       defaultSort: 'date',
       page,
       limit,
@@ -380,7 +380,7 @@ class AttendanceService {
    * @returns {Object} Send result
    */
   static async sendReportToParents(idSchedule, date) {
-    const whatsappService = require('./whatsappService');
+    const { sendSessionReportToParent } = require('./notificationService');
     
     // Get session summary
     const summary = await this.getClassSessionSummary(idSchedule, date);
@@ -400,56 +400,29 @@ class AttendanceService {
         continue;
       }
 
-      // Build message
-      let message = `*LAPORAN KEGIATAN BELAJAR*\n\n`;
-      message += `Yth. Orang Tua/Wali dari *${student.name}*\n\n`;
-      message += `📅 Tanggal: ${new Date(date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
-      message += `📚 Mata Pelajaran: ${summary.schedule.subject}\n`;
-      message += `👨‍🏫 Guru: ${summary.schedule.teacher}\n`;
-      message += `🏫 Kelas: ${summary.schedule.class}\n`;
-      message += `⏰ Waktu: ${summary.schedule.start_time} - ${summary.schedule.end_time}\n\n`;
-      
-      // Attendance status
-      message += `*KEHADIRAN*\n`;
-      const statusEmoji = {
-        'hadir': '✅',
-        'izin': '📝',
-        'alfa': '❌'
-      };
-      message += `${statusEmoji[attendance.status]} Status: ${attendance.status.toUpperCase()}\n`;
-      if (attendance.note) {
-        message += `📌 Catatan: ${attendance.note}\n`;
-      }
-      message += `\n`;
+      // Format assignments untuk shared function
+      const formattedAssignments = summary.assignments 
+        ? summary.assignments.map(assignment => ({
+            title: assignment.assignment_title,
+            description: assignment.assignment_desc,
+            deadline: assignment.deadline
+          }))
+        : [];
 
-      // Assignments
-      if (summary.assignments && summary.assignments.length > 0) {
-        message += `*TUGAS YANG DIBERIKAN*\n`;
-        summary.assignments.forEach((assignment, index) => {
-          message += `${index + 1}. ${assignment.assignment_title}\n`;
-          message += `   📝 ${assignment.assignment_desc}\n`;
-          message += `   ⏰ Deadline: ${new Date(assignment.deadline).toLocaleDateString('id-ID')}\n`;
-        });
-        message += `\n`;
-      }
-
-      // Announcements
-      if (summary.announcements && summary.announcements.length > 0) {
-        message += `*PENGUMUMAN*\n`;
-        summary.announcements.forEach((announcement, index) => {
-          message += `${index + 1}. ${announcement.title}\n`;
-          message += `   ${announcement.desc}\n`;
-        });
-        message += `\n`;
-      }
-
-      message += `Terima kasih atas perhatian dan dukungan Anda.\n\n`;
-      message += `Hormat kami,\n`;
-      message += `${summary.schedule.teacher}\n`;
-      message += `Sekolah Pelita Bangsa`;
-
-      // Send WhatsApp message
-      const result = await whatsappService.sendMessage(student.parent_telephone, message);
+      // Send WhatsApp message menggunakan shared function
+      const result = await sendSessionReportToParent({
+        parentPhone: student.parent_telephone,
+        studentName: student.name,
+        className: summary.schedule.class,
+        subjectName: summary.schedule.subject,
+        teacherName: summary.schedule.teacher,
+        timeSlot: `${summary.schedule.start_time} - ${summary.schedule.end_time}`,
+        date,
+        attendanceStatus: attendance.status,
+        attendanceNote: attendance.note,
+        assignments: formattedAssignments,
+        announcements: summary.announcements || []
+      });
       
       if (result.success) {
         sendResults.push({

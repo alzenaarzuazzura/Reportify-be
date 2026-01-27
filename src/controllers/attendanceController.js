@@ -36,7 +36,7 @@ const getAllAttendances = async (req, res) => {
     if (queryParams.filters.date_from && queryParams.filters.date_to) {
       if (!Validator.isValidDateRange(queryParams.filters.date_from, queryParams.filters.date_to)) {
         return res.status(400).json({
-          success: false,
+          status: false,
           message: 'Invalid date range'
         });
       }
@@ -47,7 +47,7 @@ const getAllAttendances = async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan', 
       error: error.message 
     });
@@ -60,13 +60,14 @@ const getAttendanceById = async (req, res) => {
     const attendance = await AttendanceService.getAttendanceById(id);
 
     res.json({
-      success: true,
+      status: true,
+      message: 'Data absensi berhasil diambil',
       data: attendance
     });
   } catch (error) {
     const statusCode = error.message === 'Absensi tidak ditemukan' ? 404 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -77,13 +78,13 @@ const createAttendance = async (req, res) => {
     const attendance = await AttendanceService.createAttendance(req.body);
 
     res.status(201).json({
-      success: true,
+      status: true,
       message: 'Absensi berhasil dibuat',
       data: attendance
     });
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -95,7 +96,7 @@ const createBulkAttendance = async (req, res) => {
 
     if (!Array.isArray(attendances) || attendances.length === 0) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Attendances harus berupa array dan tidak boleh kosong'
       });
     }
@@ -103,12 +104,12 @@ const createBulkAttendance = async (req, res) => {
     const result = await AttendanceService.createBulkAttendance(attendances);
 
     res.status(201).json({
-      success: true,
+      status: true,
       ...result
     });
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -120,14 +121,14 @@ const updateAttendance = async (req, res) => {
     const attendance = await AttendanceService.updateAttendance(id, req.body);
 
     res.json({
-      success: true,
+      status: true,
       message: 'Absensi berhasil diupdate',
       data: attendance
     });
   } catch (error) {
     const statusCode = error.message === 'Absensi tidak ditemukan' ? 404 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -139,13 +140,13 @@ const deleteAttendance = async (req, res) => {
     const result = await AttendanceService.deleteAttendance(id);
 
     res.json({
-      success: true,
+      status: true,
       ...result
     });
   } catch (error) {
     const statusCode = error.message === 'Absensi tidak ditemukan' ? 404 : 500;
     res.status(statusCode).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -164,7 +165,7 @@ const checkAttendance = async (req, res) => {
     // Validation
     if (!id_schedule || !date) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Parameter id_schedule dan date wajib diisi'
       });
     }
@@ -172,7 +173,7 @@ const checkAttendance = async (req, res) => {
     // Validate date format (YYYY-MM-DD)
     if (!Validator.isValidDate(date)) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Format date harus YYYY-MM-DD'
       });
     }
@@ -183,12 +184,13 @@ const checkAttendance = async (req, res) => {
     );
 
     res.json({
-      success: true,
+      status: true,
+      message: 'Pengecekan absensi berhasil',
       exists
     });
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -204,7 +206,7 @@ const getClassSessionSummary = async (req, res) => {
 
     if (!id_schedule || !date) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Parameter id_schedule dan date wajib diisi'
       });
     }
@@ -215,12 +217,13 @@ const getClassSessionSummary = async (req, res) => {
     );
 
     res.json({
-      success: true,
+      status: true,
+      message: 'Ringkasan sesi berhasil diambil',
       data: summary
     });
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }
@@ -238,7 +241,7 @@ const sendReportToParents = async (req, res) => {
 
     if (!id_schedule || !date) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Parameter id_schedule dan date wajib diisi'
       });
     }
@@ -249,12 +252,12 @@ const sendReportToParents = async (req, res) => {
     );
 
     res.json({
-      success: true,
+      status: true,
       ...result
     });
   } catch (error) {
     res.status(500).json({ 
-      success: false,
+      status: false,
       message: error.message 
     });
   }

@@ -1,64 +1,136 @@
 const { PrismaClient } = require('@prisma/client');
-const axios = require('axios');
+const whatsappService = require('./whatsappService');
 
 const prisma = new PrismaClient();
 
-// WhatsApp API Configuration
-const WA_API_URL = 'https://wa-reportify.devops.my.id/send/message';
-const WA_API_USER = 'reportify';
-const WA_API_PASSWORD = 'password';
-
 /**
- * Format phone number to WhatsApp format
- * @param {string} phone - Phone number (08xxx or 628xxx)
- * @returns {string} Formatted phone (628xxx@s.whatsapp.net)
+ * SHARED FUNCTION: Build class session report message
+ * Digunakan oleh notificationService dan attendanceService
+ * @param {Object} params - Message parameters
+ * @returns {string} Formatted WhatsApp message
  */
-const formatPhoneNumber = (phone) => {
-  // Remove all non-numeric characters
-  let cleaned = phone.replace(/\D/g, '');
+const buildSessionReportMessage = ({
+  studentName,
+  className,
+  subjectName,
+  teacherName,
+  timeSlot,
+  date,
+  attendanceStatus,
+  attendanceNote,
+  assignments,
+  announcements
+}) => {
+  let message = `*LAPORAN KEGIATAN BELAJAR*\n\n`;
+  message += `Yth. Orang Tua/Wali dari *${studentName}*\n\n`;
+  message += `📅 Tanggal: ${new Date(date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+  message += `📚 Mata Pelajaran: ${subjectName}\n`;
+  message += `👨‍🏫 Guru: ${teacherName}\n`;
+  message += `🏫 Kelas: ${className}\n`;
+  message += `⏰ Waktu: ${timeSlot}\n\n`;
   
-  // Convert 08xxx to 628xxx
-  if (cleaned.startsWith('08')) {
-    cleaned = '62' + cleaned.substring(1);
+  // Attendance status
+  message += `*KEHADIRAN*\n`;
+  const statusEmoji = {
+    'hadir': '✅',
+    'Hadir': '✅',
+    'izin': '📝',
+    'Izin': '📝',
+    'alfa': '❌',
+    'Alpha': '❌',
+    'Belum diabsen': '⏳'
+  };
+  message += `${statusEmoji[attendanceStatus] || '❓'} Status: ${attendanceStatus.toUpperCase()}\n`;
+  if (attendanceNote) {
+    message += `📌 Catatan: ${attendanceNote}\n`;
   }
-  
-  // Add WhatsApp suffix
-  return `${cleaned}@s.whatsapp.net`;
+  message += `\n`;
+
+  // Assignments
+  if (assignments && assignments.length > 0) {
+    message += `*TUGAS YANG DIBERIKAN*\n`;
+    assignments.forEach((assignment, index) => {
+      message += `${index + 1}. ${assignment.title}\n`;
+      if (assignment.description) {
+        message += `   📝 ${assignment.description}\n`;
+      }
+      if (assignment.deadline) {
+        message += `   ⏰ Deadline: ${new Date(assignment.deadline).toLocaleDateString('id-ID')}\n`;
+      }
+      if (assignment.status !== undefined) {
+        message += `   ${assignment.status ? '✅ Sudah mengerjakan' : '⏳ Belum mengerjakan'}\n`;
+      }
+    });
+    message += `\n`;
+  }
+
+  // Announcements
+  if (announcements && announcements.length > 0) {
+    message += `*PENGUMUMAN*\n`;
+    announcements.forEach((announcement, index) => {
+      const dateStr = announcement.date ? new Date(announcement.date).toLocaleDateString('id-ID') : '';
+      message += `${index + 1}. ${announcement.title}`;
+      if (dateStr) message += ` [${dateStr}]`;
+      message += `\n`;
+      if (announcement.desc) {
+        message += `   ${announcement.desc}\n`;
+      }
+    });
+    message += `\n`;
+  }
+
+  message += `Terima kasih atas perhatian dan dukungan Anda.\n\n`;
+  message += `Hormat kami,\n`;
+  message += `${teacherName}\n`;
+  message += `SMKN 2 Surabaya`;
+
+  return message;
 };
 
 /**
- * Send WhatsApp message using API
- * @param {string} phone - Phone number
- * @param {string} message - Message text
+ * SHARED FUNCTION: Send session report to parent
+ * @param {Object} params - Send parameters
+ * @returns {Promise<Object>} Send result
  */
-const sendWhatsApp = async (phone, message) => {
-  try {
-    const formattedPhone = formatPhoneNumber(phone);
-    
-    const response = await axios.post(
-      WA_API_URL,
-      {
-        phone: formattedPhone,
-        message: message,
-        is_forwarded: false
-      },
-      {
-        auth: {
-          username: WA_API_USER,
-          password: WA_API_PASSWORD
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    console.log(`✅ WA sent to ${formattedPhone}: Success`);
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error(`❌ WA failed to ${phone}:`, error.response?.data || error.message);
-    return { success: false, error: error.message };
+const sendSessionReportToParent = async ({
+  parentPhone,
+  studentName,
+  className,
+  subjectName,
+  teacherName,
+  timeSlot,
+  date,
+  attendanceStatus,
+  attendanceNote,
+  assignments,
+  announcements
+}) => {
+  if (!parentPhone) {
+    return {
+      success: false,
+      error: 'Nomor telepon wali murid tidak tersedia'
+    };
   }
+
+  const message = buildSessionReportMessage({
+    studentName,
+    className,
+    subjectName,
+    teacherName,
+    timeSlot,
+    date,
+    attendanceStatus,
+    attendanceNote,
+    assignments,
+    announcements
+  });
+
+  return await whatsappService.sendMessage(parentPhone, message);
+};
+
+module.exports = {
+  buildSessionReportMessage,
+  sendSessionReportToParent
 };
 
 const scheduleNotifications = async () => {
@@ -83,27 +155,19 @@ const scheduleNotifications = async () => {
 
     // Format waktu sekarang (HH:MM:SS)
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
-    
-    // Hitung 5 menit yang lalu (window untuk deteksi kelas baru selesai)
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-    const timeWindowStart = `${String(fiveMinutesAgo.getHours()).padStart(2, '0')}:${String(fiveMinutesAgo.getMinutes()).padStart(2, '0')}:00`;
 
     console.log(`\n=== CHECKING NOTIFICATIONS ===`);
     console.log(`Day: ${currentDay}`);
     console.log(`Current Time: ${currentTime}`);
-    console.log(`Time Window: ${timeWindowStart} - ${currentTime}`);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Cari schedule yang baru selesai dalam 5 menit terakhir DAN belum dikirim notifikasi hari ini
+    // Cari schedule yang end_time-nya sama dengan waktu sekarang DAN belum dikirim notifikasi hari ini
     const schedules = await prisma.schedules.findMany({
       where: {
         day: currentDay,
-        end_time: {
-          gte: timeWindowStart,  // Selesai >= 5 menit yang lalu
-          lte: currentTime       // Selesai <= sekarang
-        },
+        end_time: currentTime,
         OR: [
           { notification_sent_date: null },
           { notification_sent_date: { lt: today } }
@@ -130,7 +194,7 @@ const scheduleNotifications = async () => {
     console.log(`Found ${schedules.length} schedules that just ended`);
 
     if (schedules.length === 0) {
-      console.log('No notifications to send');
+      console.log('No notifications to send at this time');
       return;
     }
 
@@ -151,16 +215,10 @@ const scheduleNotifications = async () => {
             id_teaching_assignment: schedule.teaching_assignment.id,
             id_schedule: schedule.id,
             date: {
-              gte: today,  // >= 00:00:00 hari ini
-              lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)  // < 00:00:00 besok
+              gte: today,
+              lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
             }
           }
-        });
-
-        console.log(`   Checking attendance for ${student.name}:`, {
-          found: !!attendance,
-          status: attendance?.status,
-          date: attendance?.date
         });
 
         const attendanceStatusMap = {
@@ -177,7 +235,7 @@ const scheduleNotifications = async () => {
           where: {
             id_teaching_assignment: schedule.teaching_assignment.id,
             deadline: {
-              gte: today  // Belum deadline
+              gte: today
             }
           },
           include: {
@@ -192,22 +250,15 @@ const scheduleNotifications = async () => {
           }
         });
 
-        let taskText = '';
-        if (assignments.length === 0) {
-          taskText = 'Tidak ada tugas';
-        } else {
-          const taskLines = assignments.map((assignment, index) => {
-            const studentAssignment = assignment.student_assignments[0];
-            if (!studentAssignment) {
-              return `Tugas ${index + 1} (${assignment.assignment_title}): Belum ada tugas`;
-            }
-            
-            const status = studentAssignment.status ? 'Sudah mengerjakan' : 'Belum mengerjakan';
-            const note = studentAssignment.note ? ` (Catatan: ${studentAssignment.note})` : '';
-            return `Tugas ${index + 1} (${assignment.assignment_title}): ${status}${note}`;
-          });
-          taskText = taskLines.join('\n');
-        }
+        const formattedAssignments = assignments.map(assignment => {
+          const studentAssignment = assignment.student_assignments[0];
+          return {
+            title: assignment.assignment_title,
+            description: assignment.assignment_desc,
+            deadline: assignment.deadline,
+            status: studentAssignment ? studentAssignment.status : false
+          };
+        });
 
         // 3. Cek pengumuman 7 hari terakhir
         const sevenDaysAgo = new Date(today);
@@ -225,57 +276,46 @@ const scheduleNotifications = async () => {
           }
         });
 
-        let announcementText = '';
-        if (announcements.length === 0) {
-          announcementText = 'Tidak ada pengumuman';
-        } else {
-          const announcementLines = announcements.map((announcement) => {
-            const dateStr = new Date(announcement.date).toLocaleDateString('id-ID');
-            return `- [${dateStr}] ${announcement.title}\n  ${announcement.desc}`;
-          });
-          announcementText = announcementLines.join('\n\n');
-        }
-
-        // 4. Generate pesan dengan format yang diminta
-        const message = `Yth. Bapak/Ibu Wali Murid,
-
-Kami sampaikan informasi pembelajaran dengan detail sebagai berikut:
-
-Nama Siswa : ${student.name}
-Kelas : ${className}
-Mata Pelajaran : ${subjectName}
-Guru Mata Pelajaran : ${teacherName}
-Jam Pelajaran : ${timeSlot}
-
-Absensi : ${attendanceStatus}
-Tugas :
-${taskText}
-
-Pengumuman:
-${announcementText}
-
-Demikian informasi yang kami sampaikan.
-Atas perhatian Bapak/Ibu, kami ucapkan terima kasih.
-
-Hormat kami,
-SMKN 2 Surabaya`;
-
-        // 5. Kirim WA ke orangtua dan siswa (avoid double send jika nomornya sama)
+        // 4. Kirim WA menggunakan shared function
         console.log(`\n📱 Sending notification for ${student.name}...`);
         
-        const phonesSent = new Set(); // Track nomor yang sudah dikirim
+        const phonesSent = new Set();
         
         // Kirim ke orangtua (wajib)
         if (student.parent_telephone) {
-          const parentResult = await sendWhatsApp(student.parent_telephone, message);
-          console.log(`   - Parent (${student.parent_telephone}): ${parentResult.success ? '✅' : '❌'}`);
+          const result = await sendSessionReportToParent({
+            parentPhone: student.parent_telephone,
+            studentName: student.name,
+            className,
+            subjectName,
+            teacherName,
+            timeSlot,
+            date: today,
+            attendanceStatus,
+            attendanceNote: attendance?.note,
+            assignments: formattedAssignments,
+            announcements
+          });
+          console.log(`   - Parent (${student.parent_telephone}): ${result.success ? '✅' : '❌'}`);
           phonesSent.add(student.parent_telephone);
         }
         
         // Kirim ke siswa (opsional, jika ada nomor DAN berbeda dari orangtua)
         if (student.student_telephone && !phonesSent.has(student.student_telephone)) {
-          const studentResult = await sendWhatsApp(student.student_telephone, message);
-          console.log(`   - Student (${student.student_telephone}): ${studentResult.success ? '✅' : '❌'}`);
+          const result = await sendSessionReportToParent({
+            parentPhone: student.student_telephone,
+            studentName: student.name,
+            className,
+            subjectName,
+            teacherName,
+            timeSlot,
+            date: today,
+            attendanceStatus,
+            attendanceNote: attendance?.note,
+            assignments: formattedAssignments,
+            announcements
+          });
+          console.log(`   - Student (${student.student_telephone}): ${result.success ? '✅' : '❌'}`);
         } else if (student.student_telephone && phonesSent.has(student.student_telephone)) {
           console.log(`   - Student (${student.student_telephone}): ⏭️ Skipped (same as parent)`);
         }
@@ -283,7 +323,7 @@ SMKN 2 Surabaya`;
         console.log('='.repeat(50));
       }
 
-      // Update notification_sent_date setelah semua siswa di schedule ini sudah dikirim notifikasi
+      // Update notification_sent_date
       await prisma.schedules.update({
         where: { id: schedule.id },
         data: { notification_sent_date: new Date() }
@@ -295,4 +335,8 @@ SMKN 2 Surabaya`;
   }
 };
 
-module.exports = { scheduleNotifications };
+module.exports = { 
+  scheduleNotifications,
+  buildSessionReportMessage,
+  sendSessionReportToParent
+};

@@ -1,82 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
-const axios = require('axios');
-const crypto = require('crypto');
+const whatsappService = require('./whatsappService');
+const resetPasswordService = require('./resetPasswordService');
 
 const prisma = new PrismaClient();
 
-// WhatsApp API Configuration
-const WA_API_URL = 'https://wa-reportify.devops.my.id/send/message';
-const WA_API_USER = 'reportify';
-const WA_API_PASSWORD = 'password';
-
 // Frontend URL untuk link set password
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-
-/**
- * Format phone number to WhatsApp format
- * @param {string} phone - Phone number (08xxx or 628xxx)
- * @returns {string} Formatted phone (628xxx@s.whatsapp.net)
- */
-const formatPhoneNumber = (phone) => {
-  // Remove all non-numeric characters
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // Convert 08xxx to 628xxx
-  if (cleaned.startsWith('08')) {
-    cleaned = '62' + cleaned.substring(1);
-  }
-  
-  // Add WhatsApp suffix
-  return `${cleaned}@s.whatsapp.net`;
-};
-
-/**
- * Send WhatsApp message using API
- * @param {string} phone - Phone number
- * @param {string} message - Message text
- * @returns {Object} Result object with success status
- */
-const sendWhatsApp = async (phone, message) => {
-  try {
-    const formattedPhone = formatPhoneNumber(phone);
-    
-    const response = await axios.post(
-      WA_API_URL,
-      {
-        phone: formattedPhone,
-        message: message,
-        is_forwarded: false
-      },
-      {
-        auth: {
-          username: WA_API_USER,
-          password: WA_API_PASSWORD
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return { success: true, data: response.data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Generate secure random token for password reset
- * @returns {Object} Object with plain token and hashed token
- */
-const generateResetToken = () => {
-  const plainToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(plainToken)
-    .digest('hex');
-  
-  return { plainToken, hashedToken };
-};
 
 /**
  * Send WhatsApp to teacher for setting up password
@@ -126,49 +55,16 @@ const sendTeacherSetPasswordWA = async (teacherId) => {
     // 2. Cek apakah token sudah ada dan masih valid
     const now = new Date();
     let plainToken;
-    let tokenExpired = teacher.reset_token_expired;
+    let tokenExpired;
 
-    // Generate token baru jika belum ada atau sudah expired
-    if (!teacher.reset_token || !tokenExpired || new Date(tokenExpired) < now) {
-      console.log('🔄 Generating new reset token...');
-      
-      const { plainToken: newPlainToken, hashedToken } = generateResetToken();
-      plainToken = newPlainToken;
-      
-      // Token berlaku 1 jam ke depan
-      tokenExpired = new Date(now.getTime() + 60 * 60 * 1000);
+    // Generate token baru menggunakan resetPasswordService
+    console.log('🔄 Generating new reset token...');
+    
+    const tokenData = await resetPasswordService.createResetToken(teacherId, 60);
+    plainToken = tokenData.plainToken;
+    tokenExpired = tokenData.expiresAt;
 
-      // Update token di database (simpan hashed token)
-      await prisma.users.update({
-        where: { id: parseInt(teacherId) },
-        data: {
-          reset_token: hashedToken,
-          reset_token_expired: tokenExpired
-        }
-      });
-
-      console.log('✅ New token generated and saved');
-    } else {
-      console.log('⚠️ Token already exists but we need to regenerate for WhatsApp link');
-      
-      // Jika token sudah ada tapi kita perlu kirim ulang, generate token baru
-      const { plainToken: newPlainToken, hashedToken } = generateResetToken();
-      plainToken = newPlainToken;
-      
-      // Token berlaku 1 jam ke depan
-      tokenExpired = new Date(now.getTime() + 60 * 60 * 1000);
-
-      // Update token di database
-      await prisma.users.update({
-        where: { id: parseInt(teacherId) },
-        data: {
-          reset_token: hashedToken,
-          reset_token_expired: tokenExpired
-        }
-      });
-
-      console.log('✅ New token generated and saved');
-    }
+    console.log('✅ New token generated and saved');
 
     // 3. Buat link set password (gunakan plain token, bukan hashed)
     const setPasswordLink = `${FRONTEND_URL}/reset-password?token=${plainToken}`;
@@ -200,7 +96,7 @@ Admin SMKN 2 Surabaya`;
 
     // 5. Kirim WhatsApp
     console.log('📱 Sending WhatsApp message...');
-    const waResult = await sendWhatsApp(teacher.phone, message);
+    const waResult = await whatsappService.sendMessage(teacher.phone, message);
 
     if (waResult.success) {
       console.log('✅ Set password link sent successfully');

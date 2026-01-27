@@ -271,7 +271,7 @@ const getAllUsers = async (req, res) => {
 
     // Return with pagination metadata
     return res.status(200).json({
-      success: true,
+      status: true,
       message: 'Berhasil mengambil data users',
       data: users,
       pagination: {

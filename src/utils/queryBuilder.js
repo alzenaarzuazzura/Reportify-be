@@ -143,7 +143,8 @@ class QueryBuilder {
     const totalPages = Math.ceil(total / parsedLimit);
 
     return {
-      success: true,
+      status: true,
+      message: 'Data berhasil diambil',
       data,
       pagination: {
         total,

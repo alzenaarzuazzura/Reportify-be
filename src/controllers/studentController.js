@@ -209,7 +209,8 @@ const getAllStudents = async (req, res) => {
     }));
 
     return res.json({
-      success: true,
+      status: true,
+      message: 'Data siswa berhasil diambil',
       data: formattedData,
       pagination: result.pagination
     });
@@ -217,7 +218,7 @@ const getAllStudents = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });

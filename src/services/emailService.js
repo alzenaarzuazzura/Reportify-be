@@ -107,7 +107,7 @@ const sendResetPasswordLink = async (user, resetLink) => {
       
       <p style="color: #999; font-size: 12px;">
         Hormat kami,<br>
-        <strong>Admin Sekolah Pelita Bangsa</strong>
+        <strong>Admin SMKN 2 Surabaya</strong>
       </p>
     </div>
   `;

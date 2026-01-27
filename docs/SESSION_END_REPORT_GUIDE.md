@@ -58,7 +58,7 @@ Terima kasih atas perhatian dan dukungan Anda.
 
 Hormat kami,
 [Nama Guru]
-Sekolah Pelita Bangsa
+SMKN 2 Surabaya
 ```
 
 ## API Endpoints

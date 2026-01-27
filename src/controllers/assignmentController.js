@@ -225,7 +225,7 @@ const updateStudentAssignment = async (req, res) => {
 
     if (!existingAssignment) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Student assignment tidak ditemukan'
       });
     }
@@ -258,14 +258,14 @@ const updateStudentAssignment = async (req, res) => {
     console.log('Updated Assignment:', assignment);
 
     res.json({
-      success: true,
+      status: true,
       message: 'Student assignment berhasil diupdate',
       data: assignment
     });
   } catch (error) {
     console.error('Error updating student assignment:', error);
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -294,7 +294,7 @@ const getStudentCompletionStatus = async (req, res) => {
 
     if (!assignment) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Assignment tidak ditemukan'
       });
     }
@@ -304,7 +304,7 @@ const getStudentCompletionStatus = async (req, res) => {
     const notCompleted = assignment.student_assignments.filter(sa => sa.status === false);
 
     res.json({
-      success: true,
+      status: true,
       data: {
         total: assignment.student_assignments.length,
         completed_count: completed.length,
@@ -327,7 +327,7 @@ const getStudentCompletionStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -359,7 +359,7 @@ const getMissingStudents = async (req, res) => {
 
     if (!assignment) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Assignment tidak ditemukan'
       });
     }
@@ -385,7 +385,7 @@ const getMissingStudents = async (req, res) => {
     );
 
     res.json({
-      success: true,
+      status: true,
       data: {
         total_students: allStudents.length,
         generated: existingStudentIds.length,
@@ -395,7 +395,7 @@ const getMissingStudents = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -429,7 +429,7 @@ const generateStudentAssignments = async (req, res) => {
 
     if (!assignment) {
       return res.status(404).json({
-        success: false,
+        status: false,
         message: 'Assignment tidak ditemukan'
       });
     }
@@ -455,7 +455,7 @@ const generateStudentAssignments = async (req, res) => {
 
     if (newStudentIds.length === 0) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Semua siswa sudah memiliki student_assignment'
       });
     }
@@ -484,13 +484,13 @@ const generateStudentAssignments = async (req, res) => {
     });
 
     res.status(201).json({
-      success: true,
+      status: true,
       message: `Berhasil menambahkan ${newStudentIds.length} student assignments`,
       data: updatedAssignment
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -508,3 +508,4 @@ module.exports = {
   getMissingStudents,
   getStudentCompletionStatus
 };
+

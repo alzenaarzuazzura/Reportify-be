@@ -14,7 +14,7 @@ const getAttendanceReport = async (req, res) => {
 
     if (!startDate || !endDate) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Start date dan end date harus diisi'
       });
     }
@@ -27,12 +27,12 @@ const getAttendanceReport = async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: true,
       data: report
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -53,7 +53,7 @@ const getAssignmentReport = async (req, res) => {
 
     if (!startDate || !endDate) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Start date dan end date harus diisi'
       });
     }
@@ -66,12 +66,12 @@ const getAssignmentReport = async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: true,
       data: report
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -91,7 +91,7 @@ const getTeacherActivityReport = async (req, res) => {
 
     if (!startDate || !endDate) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Start date dan end date harus diisi'
       });
     }
@@ -103,12 +103,12 @@ const getTeacherActivityReport = async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: true,
       data: report
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -128,7 +128,7 @@ const getStudentPerformanceReport = async (req, res) => {
 
     if (!startDate || !endDate || !id_student) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Start date, end date, dan student ID harus diisi'
       });
     }
@@ -140,12 +140,12 @@ const getStudentPerformanceReport = async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: true,
       data: report
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -165,7 +165,7 @@ const getClassSummaryReport = async (req, res) => {
 
     if (!startDate || !endDate || !id_class) {
       return res.status(400).json({
-        success: false,
+        status: false,
         message: 'Start date, end date, dan class ID harus diisi'
       });
     }
@@ -177,12 +177,12 @@ const getClassSummaryReport = async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: true,
       data: report
     });
   } catch (error) {
     res.status(500).json({
-      success: false,
+      status: false,
       message: 'Terjadi kesalahan',
       error: error.message
     });
@@ -196,3 +196,4 @@ module.exports = {
   getStudentPerformanceReport,
   getClassSummaryReport
 };
+

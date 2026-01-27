@@ -96,7 +96,7 @@ Silakan klik link berikut untuk mengatur password baru:
 Jika Anda tidak merasa meminta reset password, abaikan pesan ini atau hubungi administrator.
 
 Hormat kami,
-Admin Sekolah Pelita Bangsa`;
+Admin SMKN 2 Surabaya`;
 
   return await sendMessage(user.phone, message);
 };
