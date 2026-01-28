@@ -313,20 +313,43 @@ class AttendanceService {
       }
     });
 
-    // Get assignments for this class on this date
+    // Get assignments for this class
+    // Ambil tugas yang:
+    // - Belum deadline (deadline >= hari ini), ATAU
+    // - Baru dibuat dalam 7 hari terakhir
+    const today = new Date(date);
+    today.setHours(0, 0, 0, 0);
+    
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     const assignments = await prisma.assignments.findMany({
       where: {
         id_teaching_assignment: schedule.id_teaching_assignment,
-        deadline: {
-          gte: new Date(date),
-          lte: new Date(new Date(date).setHours(23, 59, 59))
-        }
+        OR: [
+          {
+            // Tugas yang belum deadline
+            deadline: {
+              gte: today
+            }
+          },
+          {
+            // Tugas yang baru dibuat dalam 7 hari terakhir
+            created_at: {
+              gte: sevenDaysAgo
+            }
+          }
+        ]
       },
       select: {
         id: true,
         assignment_title: true,
         assignment_desc: true,
-        deadline: true
+        deadline: true,
+        created_at: true
+      },
+      orderBy: {
+        deadline: 'asc'
       }
     });
 
@@ -400,12 +423,33 @@ class AttendanceService {
         continue;
       }
 
-      // Format assignments untuk shared function
+      // Get student-specific assignment status
+      const studentAssignments = await prisma.student_assignments.findMany({
+        where: {
+          id_student: student.id,
+          assignment: {
+            id_teaching_assignment: summary.schedule.id_teaching_assignment
+          }
+        },
+        select: {
+          id_assignment: true,
+          status: true
+        }
+      });
+
+      // Create map for quick lookup
+      const assignmentStatusMap = new Map();
+      studentAssignments.forEach(sa => {
+        assignmentStatusMap.set(sa.id_assignment, sa.status);
+      });
+
+      // Format assignments dengan status per siswa
       const formattedAssignments = summary.assignments 
         ? summary.assignments.map(assignment => ({
             title: assignment.assignment_title,
             description: assignment.assignment_desc,
-            deadline: assignment.deadline
+            deadline: assignment.deadline,
+            status: assignmentStatusMap.get(assignment.id) || false
           }))
         : [];
 

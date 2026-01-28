@@ -7,6 +7,13 @@ const { authenticate } = require('../middleware/authMiddleware');
 router.use(authenticate);
 
 /**
+ * @route   GET /profile
+ * @desc    Get current user profile
+ * @access  Private (all authenticated users)
+ */
+router.get('/', profileController.getProfile);
+
+/**
  * @route   POST /profile/change-password
  * @desc    Change user password
  * @access  Private

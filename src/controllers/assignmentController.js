@@ -212,12 +212,6 @@ const updateStudentAssignment = async (req, res) => {
     const { id } = req.params;
     const { status, note } = req.body;
 
-    console.log('=== UPDATE STUDENT ASSIGNMENT ===');
-    console.log('ID:', id);
-    console.log('Request Body:', req.body);
-    console.log('Status:', status, typeof status);
-    console.log('Note:', note);
-
     // Check if student assignment exists
     const existingAssignment = await prisma.student_assignments.findUnique({
       where: { id: parseInt(id) }
@@ -244,8 +238,6 @@ const updateStudentAssignment = async (req, res) => {
       updateData.note = note;
     }
 
-    console.log('Update Data:', updateData);
-
     const assignment = await prisma.student_assignments.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -254,8 +246,6 @@ const updateStudentAssignment = async (req, res) => {
         assignment: true
       }
     });
-
-    console.log('Updated Assignment:', assignment);
 
     res.json({
       status: true,

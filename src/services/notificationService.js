@@ -23,11 +23,12 @@ const buildSessionReportMessage = ({
 }) => {
   let message = `*LAPORAN KEGIATAN BELAJAR*\n\n`;
   message += `Yth. Orang Tua/Wali dari *${studentName}*\n\n`;
-  message += `📅 Tanggal: ${new Date(date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
-  message += `📚 Mata Pelajaran: ${subjectName}\n`;
-  message += `👨‍🏫 Guru: ${teacherName}\n`;
-  message += `🏫 Kelas: ${className}\n`;
-  message += `⏰ Waktu: ${timeSlot}\n\n`;
+  message += `Kami sampaikan informasi pembelajaran dengan detail sebagai berikut:\n\n`;
+  message += `Tanggal: ${new Date(date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+  message += `Mata Pelajaran: ${subjectName}\n`;
+  message += `Guru: ${teacherName}\n`;
+  message += `Kelas: ${className}\n`;
+  message += `Waktu: ${timeSlot}\n\n`;
   
   // Attendance status
   message += `*KEHADIRAN*\n`;
@@ -52,13 +53,13 @@ const buildSessionReportMessage = ({
     assignments.forEach((assignment, index) => {
       message += `${index + 1}. ${assignment.title}\n`;
       if (assignment.description) {
-        message += `   📝 ${assignment.description}\n`;
+        message += `   Deskripsi: ${assignment.description}\n`;
       }
       if (assignment.deadline) {
-        message += `   ⏰ Deadline: ${new Date(assignment.deadline).toLocaleDateString('id-ID')}\n`;
+        message += `   Deadline: ${new Date(assignment.deadline).toLocaleDateString('id-ID')}\n`;
       }
       if (assignment.status !== undefined) {
-        message += `   ${assignment.status ? '✅ Sudah mengerjakan' : '⏳ Belum mengerjakan'}\n`;
+        message += `   ${assignment.status ? 'Sudah mengerjakan' : 'Belum mengerjakan'}\n`;
       }
     });
     message += `\n`;
@@ -69,7 +70,7 @@ const buildSessionReportMessage = ({
     message += `*PENGUMUMAN*\n`;
     announcements.forEach((announcement, index) => {
       const dateStr = announcement.date ? new Date(announcement.date).toLocaleDateString('id-ID') : '';
-      message += `${index + 1}. ${announcement.title}`;
+      message += `*${index + 1}. ${announcement.title}*`;
       if (dateStr) message += ` [${dateStr}]`;
       message += `\n`;
       if (announcement.desc) {
@@ -230,13 +231,31 @@ const scheduleNotifications = async () => {
           ? attendanceStatusMap[attendance.status] || attendance.status
           : 'Belum diabsen';
 
-        // 2. Cek tugas yang belum deadline
+        // Hitung 7 hari yang lalu untuk filter tugas dan pengumuman
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // 2. Cek tugas yang relevan untuk laporan hari ini
+        // Ambil tugas yang:
+        // - Belum deadline (deadline >= hari ini), ATAU
+        // - Baru dibuat dalam 7 hari terakhir
         const assignments = await prisma.assignments.findMany({
           where: {
             id_teaching_assignment: schedule.teaching_assignment.id,
-            deadline: {
-              gte: today
-            }
+            OR: [
+              {
+                // Tugas yang belum deadline
+                deadline: {
+                  gte: today
+                }
+              },
+              {
+                // Tugas yang baru dibuat dalam 7 hari terakhir
+                created_at: {
+                  gte: sevenDaysAgo
+                }
+              }
+            ]
           },
           include: {
             student_assignments: {
@@ -261,9 +280,6 @@ const scheduleNotifications = async () => {
         });
 
         // 3. Cek pengumuman 7 hari terakhir
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
         const announcements = await prisma.announcements.findMany({
           where: {
             id_teaching_assignment: schedule.teaching_assignment.id,

@@ -60,7 +60,6 @@ app.use('/reportify/profile', profileRoutes);
 
 // Cron job untuk mengirim notifikasi setelah jam pelajaran selesai
 cron.schedule('*/5 * * * *', async () => {
-  console.log('Checking for notifications to send...');
   await scheduleNotifications();
 });
 
