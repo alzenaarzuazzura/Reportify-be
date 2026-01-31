@@ -42,4 +42,11 @@ router.get('/student-performance', reportController.getStudentPerformanceReport)
  */
 router.get('/class-summary', reportController.getClassSummaryReport);
 
+/**
+ * @route   GET /reports/notification
+ * @desc    Get notification report (WhatsApp messages)
+ * @access  Private (Admin only)
+ */
+router.get('/notification', reportController.getNotificationReport);
+
 module.exports = router;

@@ -197,3 +197,51 @@ module.exports = {
   getClassSummaryReport
 };
 
+
+/**
+ * Get notification report (WhatsApp messages)
+ * Query params:
+ * - startDate: string (YYYY-MM-DD)
+ * - endDate: string (YYYY-MM-DD)
+ * - id_class: number (optional)
+ * - id_student: number (optional)
+ */
+const getNotificationReport = async (req, res) => {
+  try {
+    const { startDate, endDate, id_class, id_student } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        status: false,
+        message: 'Start date dan end date harus diisi'
+      });
+    }
+
+    const report = await ReportService.getNotificationReport({
+      startDate,
+      endDate,
+      id_class: id_class ? parseInt(id_class) : undefined,
+      id_student: id_student ? parseInt(id_student) : undefined
+    });
+
+    res.json({
+      status: true,
+      data: report
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: 'Terjadi kesalahan',
+      error: error.message
+    });
+  }
+};
+
+module.exports = {
+  getAttendanceReport,
+  getAssignmentReport,
+  getTeacherActivityReport,
+  getStudentPerformanceReport,
+  getClassSummaryReport,
+  getNotificationReport
+};

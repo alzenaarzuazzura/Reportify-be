@@ -643,6 +643,170 @@ class ReportService {
       studentSummary
     };
   }
+
+  /**
+   * Get notification report (WhatsApp messages sent to parents)
+   */
+  static async getNotificationReport({ startDate, endDate, id_class, id_student }) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    // Build where clause for schedules
+    const where = {};
+
+    if (id_class) {
+      where.teaching_assignment = {
+        id_class
+      };
+    }
+
+    // Get all schedules in the date range
+    const schedules = await prisma.schedules.findMany({
+      where,
+      include: {
+        teaching_assignment: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            subject: true,
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true,
+                students: {
+                  where: id_student ? { id: id_student } : {},
+                  select: {
+                    id: true,
+                    nis: true,
+                    name: true,
+                    parent_telephone: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        attendances: {
+          where: {
+            date: {
+              gte: start,
+              lte: end
+            }
+          }
+        }
+      }
+    });
+
+    // Process data to determine notification status
+    const details = [];
+    const studentNotificationMap = new Map();
+
+    schedules.forEach(schedule => {
+      const className = `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`;
+      
+      schedule.teaching_assignment.class.students.forEach(student => {
+        // Check if there are attendances for this student in the date range
+        const studentAttendances = schedule.attendances.filter(att => att.id_student === student.id);
+        
+        studentAttendances.forEach(attendance => {
+          const notificationDate = schedule.notification_sent_date;
+          const attendanceDate = new Date(attendance.date);
+          attendanceDate.setHours(0, 0, 0, 0);
+          
+          // Notification is sent if notification_sent_date matches attendance date
+          const isSent = notificationDate && 
+                        new Date(notificationDate).getTime() === attendanceDate.getTime();
+
+          const detail = {
+            id: `${schedule.id}-${student.id}-${attendance.date}`,
+            date: attendance.date,
+            student: {
+              id: student.id,
+              nis: student.nis,
+              name: student.name,
+              phone: student.parent_telephone
+            },
+            class: className,
+            subject: schedule.teaching_assignment.subject.name,
+            teacher: schedule.teaching_assignment.user.name,
+            attendanceStatus: attendance.status,
+            notificationSent: isSent,
+            notificationDate: isSent ? notificationDate : null
+          };
+
+          details.push(detail);
+
+          // Track for statistics
+          const key = `${student.id}-${attendance.date}`;
+          if (!studentNotificationMap.has(key)) {
+            studentNotificationMap.set(key, {
+              student,
+              class: className,
+              date: attendance.date,
+              sent: isSent
+            });
+          }
+        });
+      });
+    });
+
+    // Calculate statistics
+    const totalNotifications = studentNotificationMap.size;
+    const sentNotifications = Array.from(studentNotificationMap.values()).filter(n => n.sent).length;
+    const notSentNotifications = totalNotifications - sentNotifications;
+
+    const stats = {
+      total: totalNotifications,
+      sent: sentNotifications,
+      notSent: notSentNotifications,
+      sentRate: totalNotifications > 0 
+        ? ((sentNotifications / totalNotifications) * 100).toFixed(2) 
+        : '0.00'
+    };
+
+    // Group by student
+    const byStudent = [];
+    const studentMap = new Map();
+
+    details.forEach(detail => {
+      const studentId = detail.student.id;
+      if (!studentMap.has(studentId)) {
+        studentMap.set(studentId, {
+          student: detail.student,
+          class: detail.class,
+          total: 0,
+          sent: 0,
+          notSent: 0
+        });
+      }
+
+      const studentData = studentMap.get(studentId);
+      studentData.total++;
+      if (detail.notificationSent) {
+        studentData.sent++;
+      } else {
+        studentData.notSent++;
+      }
+    });
+
+    byStudent.push(...Array.from(studentMap.values()).map(data => ({
+      ...data,
+      sentRate: ((data.sent / data.total) * 100).toFixed(2)
+    })));
+
+    return {
+      period: { startDate, endDate },
+      statistics: stats,
+      byStudent,
+      details
+    };
+  }
 }
 
 module.exports = ReportService;
