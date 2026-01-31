@@ -98,7 +98,7 @@ model teaching_assignments {
 model schedules {
   id                     Int                  @id @default(autoincrement())
   id_teaching_assignment Int
-  day                    day_enum
+  day                    schedules_day
   start_time             String               @db.VarChar(10)
   end_time               String               @db.VarChar(10)
   room                   String               @db.VarChar(50)
@@ -171,16 +171,17 @@ enum role_enum {
   teacher
 }
 
-enum day_enum {
+enum status_enum {
+  hadir
+  izin
+  alfa
+}
+
+enum schedules_day {
   senin
   selasa
   rabu
   kamis
   jumat
-}
-
-enum status_enum {
-  hadir
-  izin
-  alfa
+  sabtu
 }

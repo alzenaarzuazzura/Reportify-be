@@ -253,12 +253,12 @@ const getCurrentSchedule = async (userId) => {
   console.log('Current Time:', currentTime);
   console.log('User ID:', userId);
 
-  // Valid days in database enum (only weekdays)
-  const validDays = ['senin', 'selasa', 'rabu', 'kamis', 'jumat'];
+  // Valid days in database enum (weekdays + Saturday)
+  const validDays = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
   
-  // If weekend (sabtu/minggu), return empty array
+  // If Sunday (minggu), return empty array
   if (!validDays.includes(currentDay)) {
-    console.log('⚠️ Weekend detected, no schedules available');
+    console.log('⚠️ Sunday detected, no schedules available');
     return [];
   }
 
@@ -326,10 +326,17 @@ const getCurrentSchedule = async (userId) => {
     const endTime = schedule.end_time.length === 5 ? schedule.end_time + ':00' : schedule.end_time;
     
     const isOngoing = currentTime >= startTime && currentTime <= endTime;
-    console.log(`Checking schedule ${schedule.id}: ${startTime} <= ${currentTime} <= ${endTime} = ${isOngoing}`);
+    console.log(`Checking schedule ${schedule.id}:`);
+    console.log(`  Start: ${startTime}`);
+    console.log(`  Current: ${currentTime}`);
+    console.log(`  End: ${endTime}`);
+    console.log(`  Is Ongoing: ${isOngoing}`);
+    console.log(`  Comparison: ${startTime} <= ${currentTime} <= ${endTime}`);
     
     return isOngoing;
   });
+
+  console.log('Current schedules found:', currentSchedules.length);
 
   // Format the response
   return currentSchedules.map((schedule) => {

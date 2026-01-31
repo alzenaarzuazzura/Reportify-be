@@ -145,7 +145,7 @@ const scheduleNotifications = async () => {
       'Wednesday': 'rabu',
       'Thursday': 'kamis',
       'Friday': 'jumat',
-      'Saturday': null
+      'Saturday': 'sabtu'
     };
     
     const currentDay = dayMapping[dayNames[now.getDay()]];
