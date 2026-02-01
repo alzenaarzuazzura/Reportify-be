@@ -5,13 +5,17 @@ const prisma = new PrismaClient();
 class ReportService {
   /**
    * Get attendance report
+   * Filters:
+   * - startDate & endDate: required date range
+   * - id_class: optional, filters by student's class
+   * - id_student: optional, filters by specific student
    */
   static async getAttendanceReport({ startDate, endDate, id_class, id_student }) {
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    // Build where clause
+    // Build where clause dynamically
     const where = {
       date: {
         gte: start,
@@ -19,17 +23,18 @@ class ReportService {
       }
     };
 
-    if (id_class) {
-      where.teaching_assignment = {
-        id_class
+    // Filter by specific student (highest priority)
+    if (id_student) {
+      where.id_student = parseInt(id_student);
+    } 
+    // Filter by class (only if no specific student selected)
+    else if (id_class) {
+      where.student = {
+        id_class: parseInt(id_class)
       };
     }
 
-    if (id_student) {
-      where.id_student = id_student;
-    }
-
-    // Get attendance records
+    // Get attendance records with all necessary relations
     const attendances = await prisma.attendances.findMany({
       where,
       include: {
@@ -88,50 +93,47 @@ class ReportService {
       ? ((stats.hadir / stats.total) * 100).toFixed(2) 
       : 0;
 
-    // Group by student if not filtered by student
-    let byStudent = [];
-    if (!id_student) {
-      const studentMap = new Map();
+    // Group by student - always build this from the filtered attendances
+    const studentMap = new Map();
+    
+    attendances.forEach(att => {
+      const studentId = att.student.id;
+      if (!studentMap.has(studentId)) {
+        studentMap.set(studentId, {
+          student: att.student,
+          total: 0,
+          hadir: 0,
+          sakit: 0,
+          izin: 0,
+          alpha: 0
+        });
+      }
       
-      attendances.forEach(att => {
-        const studentId = att.student.id;
-        if (!studentMap.has(studentId)) {
-          studentMap.set(studentId, {
-            student: att.student,
-            total: 0,
-            hadir: 0,
-            sakit: 0,
-            izin: 0,
-            alpha: 0
-          });
-        }
-        
-        const studentData = studentMap.get(studentId);
-        studentData.total++;
-        studentData[att.status.toLowerCase()]++;
-      });
+      const studentData = studentMap.get(studentId);
+      studentData.total++;
+      studentData[att.status.toLowerCase()]++;
+    });
 
-      byStudent = Array.from(studentMap.values()).map(data => {
-        const className = data.student.class 
-          ? `${data.student.class.level.name} ${data.student.class.major.code} ${data.student.class.rombel.name}`
-          : 'N/A';
-        
-        return {
-          student: {
-            id: data.student.id,
-            name: data.student.name,
-            nis: data.student.nis,
-            class: className
-          },
-          total: data.total,
-          hadir: data.hadir,
-          sakit: data.sakit,
-          izin: data.izin,
-          alpha: data.alpha,
-          attendanceRate: ((data.hadir / data.total) * 100).toFixed(2)
-        };
-      });
-    }
+    const byStudent = Array.from(studentMap.values()).map(data => {
+      const className = data.student.class 
+        ? `${data.student.class.level.name} ${data.student.class.major.code} ${data.student.class.rombel.name}`
+        : 'N/A';
+      
+      return {
+        student: {
+          id: data.student.id,
+          name: data.student.name,
+          nis: data.student.nis,
+          class: className
+        },
+        total: data.total,
+        hadir: data.hadir,
+        sakit: data.sakit,
+        izin: data.izin,
+        alpha: data.alpha,
+        attendanceRate: ((data.hadir / data.total) * 100).toFixed(2)
+      };
+    });
 
     return {
       period: { startDate, endDate },
@@ -157,114 +159,195 @@ class ReportService {
 
   /**
    * Get assignment report
+   * Filters:
+   * - startDate & endDate: required date range for assignment deadline
+   * - id_class: optional, filters by class
+   * - id_subject: optional, filters by subject
+   * 
+   * Returns:
+   * - Statistics of assignments
+   * - Summary by subject
+   * - Detailed list with student submission info
    */
   static async getAssignmentReport({ startDate, endDate, id_class, id_subject }) {
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    // Build where clause
-    const where = {
-      deadline: {
-        gte: start,
-        lte: end
-      }
-    };
-
+    // Build where clause for teaching assignments (dynamic filtering)
+    const taWhere = {};
+    
     if (id_class) {
-      where.teaching_assignment = {
-        id_class
-      };
+      taWhere.id_class = parseInt(id_class);
     }
-
+    
     if (id_subject) {
-      where.teaching_assignment = {
-        ...where.teaching_assignment,
-        id_subject
-      };
+      taWhere.id_subject = parseInt(id_subject);
     }
 
-    // Get assignments
-    const assignments = await prisma.assignments.findMany({
-      where,
+    // Get teaching assignments with filtered assignments by date range
+    const teachingAssignments = await prisma.teaching_assignments.findMany({
+      where: Object.keys(taWhere).length > 0 ? taWhere : undefined,
       include: {
-        teaching_assignment: {
+        subject: true,
+        class: {
           include: {
-            subject: true,
-            class: {
-              include: {
-                level: true,
-                major: true,
-                rombel: true
-              }
-            },
-            user: {
+            level: true,
+            major: true,
+            rombel: true,
+            students: {
               select: {
                 id: true,
+                nis: true,
                 name: true
+              },
+              orderBy: {
+                name: 'asc'
               }
             }
           }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        assignments: {
+          where: {
+            deadline: {
+              gte: start,
+              lte: end
+            }
+          },
+          include: {
+            student_assignments: {
+              where: {
+                status: true // Only completed assignments
+              },
+              include: {
+                student: {
+                  select: {
+                    id: true,
+                    nis: true,
+                    name: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            deadline: 'desc'
+          }
         }
-      },
-      orderBy: {
-        deadline: 'desc'
       }
     });
 
-    // Calculate statistics
+    // Process assignments and build detailed report
+    const assignmentDetails = [];
+    const subjectMap = new Map();
+    let totalAssignments = 0;
+    let totalWithAssignment = 0;
+
+    teachingAssignments.forEach(ta => {
+      // Skip if no assignments in date range
+      if (ta.assignments.length === 0) return;
+
+      const className = `${ta.class.level.name} ${ta.class.major.code} ${ta.class.rombel.name}`;
+      const totalStudents = ta.class.students.length;
+
+      ta.assignments.forEach(assignment => {
+        totalAssignments++;
+        const hasAssignment = !!(assignment.assignment_title && assignment.assignment_title.trim() !== '');
+        
+        if (hasAssignment) {
+          totalWithAssignment++;
+        }
+
+        // Count submissions (status = true means completed)
+        const submittedCount = assignment.student_assignments.length;
+        const notSubmittedCount = totalStudents - submittedCount;
+        
+        // Get list of students who submitted (with completion time)
+        const submittedStudents = assignment.student_assignments.map(sub => ({
+          id: sub.student.id,
+          nis: sub.student.nis,
+          name: sub.student.name,
+          submittedAt: sub.completed_at || new Date()
+        }));
+
+        // Get list of students who haven't submitted
+        const submittedStudentIds = new Set(submittedStudents.map(s => s.id));
+        const notSubmittedStudents = ta.class.students
+          .filter(student => !submittedStudentIds.has(student.id))
+          .map(student => ({
+            id: student.id,
+            nis: student.nis,
+            name: student.name
+          }));
+
+        assignmentDetails.push({
+          id: assignment.id,
+          date: assignment.deadline,
+          assignment: assignment.assignment_title || '-',
+          hasAssignment,
+          subject: ta.subject.name,
+          teacher: ta.user.name,
+          class: className,
+          totalStudents,
+          submittedCount,
+          notSubmittedCount,
+          submittedStudents,
+          notSubmittedStudents
+        });
+
+        // Track statistics by subject
+        const subjectId = ta.subject.id;
+        const subjectName = ta.subject.name;
+        
+        if (!subjectMap.has(subjectId)) {
+          subjectMap.set(subjectId, {
+            subject: { id: subjectId, name: subjectName },
+            total: 0,
+            withAssignment: 0,
+            withoutAssignment: 0
+          });
+        }
+        
+        const subjectData = subjectMap.get(subjectId);
+        subjectData.total++;
+        if (hasAssignment) {
+          subjectData.withAssignment++;
+        } else {
+          subjectData.withoutAssignment++;
+        }
+      });
+    });
+
+    // Calculate overall statistics
     const stats = {
-      total: assignments.length,
-      withAssignment: assignments.filter(a => a.assignment_title && a.assignment_title.trim() !== '').length,
-      withoutAssignment: assignments.filter(a => !a.assignment_title || a.assignment_title.trim() === '').length
+      total: totalAssignments,
+      withAssignment: totalWithAssignment,
+      withoutAssignment: totalAssignments - totalWithAssignment
     };
 
     stats.completionRate = stats.total > 0 
       ? ((stats.withAssignment / stats.total) * 100).toFixed(2) 
-      : 0;
+      : '0.00';
 
-    // Group by subject
-    const subjectMap = new Map();
-    assignments.forEach(ass => {
-      const subjectId = ass.teaching_assignment.subject.id;
-      const subjectName = ass.teaching_assignment.subject.name;
-      
-      if (!subjectMap.has(subjectId)) {
-        subjectMap.set(subjectId, {
-          subject: { id: subjectId, name: subjectName },
-          total: 0,
-          withAssignment: 0,
-          withoutAssignment: 0
-        });
-      }
-      
-      const subjectData = subjectMap.get(subjectId);
-      subjectData.total++;
-      if (ass.assignment_title && ass.assignment_title.trim() !== '') {
-        subjectData.withAssignment++;
-      } else {
-        subjectData.withoutAssignment++;
-      }
-    });
-
+    // Build subject summary with completion rates
     const bySubject = Array.from(subjectMap.values()).map(data => ({
       ...data,
-      completionRate: ((data.withAssignment / data.total) * 100).toFixed(2)
+      completionRate: data.total > 0 
+        ? ((data.withAssignment / data.total) * 100).toFixed(2)
+        : '0.00'
     }));
 
     return {
       period: { startDate, endDate },
       statistics: stats,
       bySubject,
-      details: assignments.map(ass => ({
-        id: ass.id,
-        date: ass.deadline,
-        assignment: ass.assignment_title,
-        hasAssignment: !!(ass.assignment_title && ass.assignment_title.trim() !== ''),
-        subject: ass.teaching_assignment.subject.name,
-        teacher: ass.teaching_assignment.user.name,
-        class: `${ass.teaching_assignment.class.level.name} ${ass.teaching_assignment.class.major.code} ${ass.teaching_assignment.class.rombel.name}`
-      }))
+      details: assignmentDetails
     };
   }
 
@@ -280,7 +363,7 @@ class ReportService {
     const where = {};
 
     if (id_teacher) {
-      where.id_user = id_teacher;
+      where.id_user = parseInt(id_teacher);
     }
 
     // Get teaching assignments with their schedules and related data
@@ -424,7 +507,7 @@ class ReportService {
 
     // Get student info
     const student = await prisma.students.findUnique({
-      where: { id: id_student },
+      where: { id: parseInt(id_student) },
       include: {
         class: {
           include: {
@@ -443,7 +526,7 @@ class ReportService {
     // Get attendance records
     const attendances = await prisma.attendances.findMany({
       where: {
-        id_student,
+        id_student: parseInt(id_student),
         date: {
           gte: start,
           lte: end
@@ -527,7 +610,7 @@ class ReportService {
 
     // Get class info
     const classInfo = await prisma.classes.findUnique({
-      where: { id: id_class },
+      where: { id: parseInt(id_class) },
       include: {
         level: true,
         major: true,
@@ -550,7 +633,7 @@ class ReportService {
     const schedules = await prisma.schedules.findMany({
       where: {
         teaching_assignment: {
-          id_class
+          id_class: parseInt(id_class)
         }
       },
       include: {
@@ -580,7 +663,7 @@ class ReportService {
     const assignments = await prisma.assignments.findMany({
       where: {
         teaching_assignment: {
-          id_class
+          id_class: parseInt(id_class)
         },
         deadline: {
           gte: start,
@@ -657,7 +740,7 @@ class ReportService {
 
     if (id_class) {
       where.teaching_assignment = {
-        id_class
+        id_class: parseInt(id_class)
       };
     }
 
@@ -680,7 +763,7 @@ class ReportService {
                 major: true,
                 rombel: true,
                 students: {
-                  where: id_student ? { id: id_student } : {},
+                  where: id_student ? { id: parseInt(id_student) } : {},
                   select: {
                     id: true,
                     nis: true,
