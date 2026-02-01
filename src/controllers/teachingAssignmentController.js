@@ -298,10 +298,78 @@ const deleteTeachingAssignment = async (req, res) => {
   }
 };
 
+const checkTeachingAssignment = async (req, res) => {
+  try {
+    const { id_class, id_subject, exclude_id } = req.query;
+
+    if (!id_class || !id_subject) {
+      return res.status(400).json(
+        errorResponse('Parameter id_class dan id_subject harus diisi')
+      );
+    }
+
+    const where = {
+      id_class: parseInt(id_class),
+      id_subject: parseInt(id_subject)
+    };
+
+    if (exclude_id) {
+      where.NOT = {
+        id: parseInt(exclude_id)
+      };
+    }
+
+    const existing = await prisma.teaching_assignments.findFirst({
+      where,
+      include: {
+        user: true,
+        class: {
+          include: {
+            level: true,
+            major: true,
+            rombel: true
+          }
+        },
+        subject: true
+      }
+    });
+
+    if (existing) {
+      return res.status(200).json({
+        status: true,
+        message: 'Kombinasi kelas dan mata pelajaran sudah ada',
+        data: {
+          exists: true,
+          assignment: {
+            id: existing.id,
+            teacher: existing.user.name,
+            class: `${existing.class.level.name} ${existing.class.major.code} ${existing.class.rombel.name}`,
+            subject: existing.subject.name
+          }
+        }
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Kombinasi kelas dan mata pelajaran belum ada',
+      data: {
+        exists: false
+      }
+    });
+  } catch (error) {
+    console.error('Error checkTeachingAssignment:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengecek penugasan')
+    );
+  }
+};
+
 module.exports = {
   getAllTeachingAssignments,
   getTeachingAssignmentById,
   createTeachingAssignment,
   updateTeachingAssignment,
-  deleteTeachingAssignment
+  deleteTeachingAssignment,
+  checkTeachingAssignment
 };
