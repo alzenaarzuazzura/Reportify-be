@@ -424,10 +424,95 @@ const deleteSchedule = async (req, res) => {
   }
 };
 
+const checkScheduleConflict = async (req, res) => {
+  try {
+    const { day, start_time, end_time, exclude_id } = req.query;
+
+    if (!day || !start_time || !end_time) {
+      return res.status(400).json(
+        errorResponse('Parameter day, start_time, dan end_time harus diisi')
+      );
+    }
+
+    const where = {
+      day: day.toLowerCase(),
+      AND: [
+        {
+          start_time: { lt: end_time }
+        },
+        {
+          end_time: { gt: start_time }
+        }
+      ]
+    };
+
+    if (exclude_id) {
+      where.NOT = {
+        id: parseInt(exclude_id)
+      };
+    }
+
+    const conflictingSchedules = await prisma.schedules.findMany({
+      where,
+      include: {
+        teaching_assignment: {
+          include: {
+            user: true,
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            },
+            subject: true
+          }
+        }
+      }
+    });
+
+    if (conflictingSchedules.length > 0) {
+      const conflicts = conflictingSchedules.map(schedule => ({
+        id: schedule.id,
+        teacher: schedule.teaching_assignment.user.name,
+        class: `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`,
+        subject: schedule.teaching_assignment.subject.name,
+        day: schedule.day,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        room: schedule.room
+      }));
+
+      return res.status(200).json({
+        status: true,
+        message: 'Ditemukan jadwal yang bentrok',
+        data: {
+          hasConflict: true,
+          conflicts: conflicts
+        }
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Tidak ada jadwal yang bentrok',
+      data: {
+        hasConflict: false
+      }
+    });
+  } catch (error) {
+    console.error('Error checkScheduleConflict:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengecek jadwal')
+    );
+  }
+};
+
 module.exports = {
   getAllSchedules,
   getScheduleById,
   createSchedule,
   updateSchedule,
-  deleteSchedule
+  deleteSchedule,
+  checkScheduleConflict
 };
