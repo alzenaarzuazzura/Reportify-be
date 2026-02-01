@@ -37,7 +37,7 @@ const sendEmail = async (to, subject, html) => {
       return { success: false, error: 'Email tidak tersedia' };
     }
     
-    const transporter = createTransporter();
+    const transporter = await createTransporter();
     
     const mailOptions = {
       from: MAIL_FROM,
