@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
-const cron = require('node-cron');
-const { scheduleNotifications } = require('./services/notificationService');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -21,6 +19,7 @@ const announcementRoutes = require('./routes/announcementRoutes');
 const comboRoutes = require('./routes/comboRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const roomRoutes = require('./routes/roomRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +55,7 @@ app.use('/reportify/classes', classRoutes);
 app.use('/reportify/levels', levelRoutes);
 app.use('/reportify/majors', majorRoutes);
 app.use('/reportify/rombels', rombelRoutes);
+app.use('/reportify/rooms', roomRoutes);
 app.use('/reportify/subjects', subjectRoutes);
 app.use('/reportify/teaching-assignments', teachingAssignmentRoutes);
 app.use('/reportify/schedules', scheduleRoutes);
@@ -65,11 +65,6 @@ app.use('/reportify/announcements', announcementRoutes);
 app.use('/reportify/combo', comboRoutes);
 app.use('/reportify/reports', reportRoutes);
 app.use('/reportify/profile', profileRoutes);
-
-// Cron job untuk mengirim notifikasi setelah jam pelajaran selesai
-cron.schedule('*/5 * * * *', async () => {
-  await scheduleNotifications();
-});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

@@ -415,14 +415,6 @@ class AttendanceService {
     for (const attendance of summary.attendance.details) {
       const student = attendance.student;
       
-      if (!student.parent_telephone) {
-        errors.push({
-          student: student.name,
-          reason: 'Nomor telepon wali murid tidak tersedia'
-        });
-        continue;
-      }
-
       // Get student-specific assignment status
       const studentAssignments = await prisma.student_assignments.findMany({
         where: {
@@ -453,32 +445,80 @@ class AttendanceService {
           }))
         : [];
 
-      // Send WhatsApp message menggunakan shared function
-      const result = await sendSessionReportToParent({
-        parentPhone: student.parent_telephone,
-        studentName: student.name,
-        className: summary.schedule.class,
-        subjectName: summary.schedule.subject,
-        teacherName: summary.schedule.teacher,
-        timeSlot: `${summary.schedule.start_time} - ${summary.schedule.end_time}`,
-        date,
-        attendanceStatus: attendance.status,
-        attendanceNote: attendance.note,
-        assignments: formattedAssignments,
-        announcements: summary.announcements || []
-      });
+      const phonesSent = new Set();
       
-      if (result.success) {
-        sendResults.push({
-          student: student.name,
-          phone: student.parent_telephone,
-          status: 'sent'
+      // Kirim ke parent_telephone (wajib)
+      if (student.parent_telephone) {
+        const result = await sendSessionReportToParent({
+          parentPhone: student.parent_telephone,
+          studentName: student.name,
+          className: summary.schedule.class,
+          subjectName: summary.schedule.subject,
+          teacherName: summary.schedule.teacher,
+          timeSlot: `${summary.schedule.start_time} - ${summary.schedule.end_time}`,
+          date,
+          attendanceStatus: attendance.status,
+          attendanceNote: attendance.note,
+          assignments: formattedAssignments,
+          announcements: summary.announcements || []
         });
-      } else {
+        
+        if (result.success) {
+          sendResults.push({
+            student: student.name,
+            phone: student.parent_telephone,
+            recipient: 'Parent',
+            status: 'sent'
+          });
+          phonesSent.add(student.parent_telephone);
+        } else {
+          errors.push({
+            student: student.name,
+            phone: student.parent_telephone,
+            recipient: 'Parent',
+            reason: result.error
+          });
+        }
+      }
+      
+      // Kirim ke student_telephone (opsional, jika ada dan berbeda dari parent)
+      if (student.student_telephone && !phonesSent.has(student.student_telephone)) {
+        const result = await sendSessionReportToParent({
+          parentPhone: student.student_telephone,
+          studentName: student.name,
+          className: summary.schedule.class,
+          subjectName: summary.schedule.subject,
+          teacherName: summary.schedule.teacher,
+          timeSlot: `${summary.schedule.start_time} - ${summary.schedule.end_time}`,
+          date,
+          attendanceStatus: attendance.status,
+          attendanceNote: attendance.note,
+          assignments: formattedAssignments,
+          announcements: summary.announcements || []
+        });
+        
+        if (result.success) {
+          sendResults.push({
+            student: student.name,
+            phone: student.student_telephone,
+            recipient: 'Student',
+            status: 'sent'
+          });
+        } else {
+          errors.push({
+            student: student.name,
+            phone: student.student_telephone,
+            recipient: 'Student',
+            reason: result.error
+          });
+        }
+      }
+      
+      // Jika tidak ada nomor sama sekali
+      if (!student.parent_telephone && !student.student_telephone) {
         errors.push({
           student: student.name,
-          phone: student.parent_telephone,
-          reason: result.error
+          reason: 'Tidak ada nomor telepon (parent/student)'
         });
       }
     }

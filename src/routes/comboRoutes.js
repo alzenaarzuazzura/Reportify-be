@@ -14,6 +14,13 @@ router.use(authenticate);
 router.get('/levels', comboController.getLevelsCombo);
 
 /**
+ * @route   GET /combo/rooms
+ * @desc    Get all rooms for combo select
+ * @access  Private
+ */
+router.get('/rooms', comboController.getRoomsCombo);
+
+/**
  * @route   GET /combo/subjects
  * @desc    Get all subjects for combo select
  * @access  Private

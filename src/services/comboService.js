@@ -24,6 +24,27 @@ const getLevels = async () => {
 };
 
 /**
+ * Get all rooms for combo select
+ * @returns {Promise<Array>} Array of {value, label}
+ */
+const getRooms = async () => {
+  const rooms = await prisma.rooms.findMany({
+    select: {
+      id: true,
+      name: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+
+  return rooms.map((level) => ({
+    value: level.id,
+    label: level.name,
+  }));
+};
+
+/**
  * Get all subjects for combo select
  * @returns {Promise<Array>} Array of {value, label}
  */
@@ -275,7 +296,11 @@ const getCurrentSchedule = async (userId) => {
       day: true,
       start_time: true,
       end_time: true,
-      room: true,
+      room: {
+        select: {
+          name: true,
+        },
+      },
       id_teaching_assignment: true,
       teaching_assignment: {
         select: {
@@ -350,7 +375,7 @@ const getCurrentSchedule = async (userId) => {
       time: `${schedule.start_time}-${schedule.end_time}`,
       class_name: className,
       subject_name: subjectName,
-      room: schedule.room,
+      room: schedule.room?.name || '-',
       id_teaching_assignment: schedule.id_teaching_assignment,
       id_class: schedule.teaching_assignment.id_class,
     };
@@ -367,5 +392,6 @@ module.exports = {
   getSubjects,
   getClasses,
   getTeachingAssignments,
-  getCurrentSchedule
+  getCurrentSchedule,
+  getRooms
 };

@@ -169,18 +169,41 @@ const importFromExcel = async (req, res) => {
 
         imported.push(user);
 
-        // Send password setup link for teachers
-        if (teacher.role === 'teacher') {
+        // Send password setup link for teachers and admins
+        if (teacher.role === 'teacher' || teacher.role === 'admin') {
           try {
             const { resetLink } = await resetPasswordService.createResetToken(user.id, 60);
             
-            // Try WhatsApp first
+            // Send to BOTH WhatsApp AND Email (tidak ada fallback, kirim keduanya)
+            const notifications = [];
+            
+            // Send WhatsApp if phone available
             if (user.phone) {
-              await whatsappService.sendResetPasswordLink(user, resetLink);
-            } else {
-              // Fallback to Email
-              await emailService.sendResetPasswordLink(user, resetLink);
+              try {
+                const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+                notifications.push({
+                  type: 'WhatsApp',
+                  success: waResult.success,
+                  phone: user.phone
+                });
+              } catch (waError) {
+                console.warn(`⚠️ WhatsApp failed for ${user.name}:`, waError.message);
+              }
             }
+            
+            // Send Email (always)
+            try {
+              const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
+              notifications.push({
+                type: 'Email',
+                success: emailResult.success,
+                email: user.email
+              });
+            } catch (emailError) {
+              console.warn(`⚠️ Email failed for ${user.name}:`, emailError.message);
+            }
+            
+            console.log(`📨 Notifications sent to ${user.name}:`, notifications);
           } catch (error) {
             console.warn(`⚠️ Failed to send notification to ${user.name}:`, error.message);
           }
@@ -379,40 +402,50 @@ const createUser = async (req, res) => {
       }
     });
 
-    // Jika user adalah teacher, kirim link set password via WhatsApp/Email
-    if (roleEnum === 'teacher') {
-      console.log(`\n📤 Sending set password link to teacher: ${name}`);
+    // Kirim link set password via WhatsApp DAN Email (untuk teacher dan admin)
+    if (roleEnum === 'teacher' || roleEnum === 'admin') {
+      console.log(`\n📤 Sending set password link to ${roleEnum}: ${name}`);
       
       try {
         // Generate reset token & link
         const { resetLink } = await resetPasswordService.createResetToken(user.id, 60);
         
-        // Try WhatsApp first
-        let deliverySuccess = false;
-        let deliveryChannel = null;
+        // Send to BOTH WhatsApp AND Email (tidak ada fallback, kirim keduanya)
+        const notifications = [];
         
+        // Send WhatsApp if phone available
         if (phone) {
-          const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
-          if (waResult.success) {
-            deliverySuccess = true;
-            deliveryChannel = 'WhatsApp';
-            console.log('✅ WhatsApp notification sent');
+          try {
+            const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+            notifications.push({
+              type: 'WhatsApp',
+              success: waResult.success,
+              phone: phone
+            });
+            if (waResult.success) {
+              console.log('✅ WhatsApp notification sent');
+            }
+          } catch (waError) {
+            console.warn('⚠️ WhatsApp failed:', waError.message);
           }
         }
         
-        // Fallback to Email
-        if (!deliverySuccess) {
+        // Send Email (always)
+        try {
           const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
+          notifications.push({
+            type: 'Email',
+            success: emailResult.success,
+            email: email
+          });
           if (emailResult.success) {
-            deliverySuccess = true;
-            deliveryChannel = 'Email';
             console.log('✅ Email notification sent');
           }
+        } catch (emailError) {
+          console.warn('⚠️ Email failed:', emailError.message);
         }
         
-        if (!deliverySuccess) {
-          console.warn('⚠️ Failed to send notification via all channels');
-        }
+        console.log(`📨 Notifications sent:`, notifications);
       } catch (error) {
         console.error('⚠️ Error sending notification:', error.message);
         // Tidak gagalkan create user, hanya log warning

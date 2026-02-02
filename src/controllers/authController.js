@@ -6,6 +6,7 @@ const resetPasswordService = require('../services/resetPasswordService');
 const passwordService = require('../services/passwordService');
 const whatsappService = require('../services/whatsappService');
 const emailService = require('../services/emailService');
+const { validatePasswordStrength, getPasswordErrorMessage } = require('../utils/passwordValidator');
 
 const prisma = new PrismaClient();
 
@@ -118,49 +119,59 @@ const forgotPassword = async (req, res) => {
     const { resetLink, expiresAt } = await resetPasswordService.createResetToken(user.id, 60);
     console.log(`Reset link: ${resetLink}`);
 
-    // Try WhatsApp first (default channel)
-    let deliverySuccess = false;
-    let deliveryChannel = null;
+    // Send to BOTH WhatsApp AND Email (tidak ada fallback, kirim keduanya)
+    const notifications = [];
+    let anySuccess = false;
 
+    // Send WhatsApp if phone available
     if (user.phone) {
-      console.log('📱 Attempting WhatsApp delivery...');
-      const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
-      
-      if (waResult.success) {
-        deliverySuccess = true;
-        deliveryChannel = 'WhatsApp';
-        console.log('✅ WhatsApp delivery successful');
-      } else {
-        console.log('⚠️ WhatsApp delivery failed, trying email fallback...');
+      console.log('📱 Sending via WhatsApp...');
+      try {
+        const waResult = await whatsappService.sendResetPasswordLink(user, resetLink);
+        notifications.push({
+          channel: 'WhatsApp',
+          success: waResult.success,
+          phone: user.phone
+        });
+        if (waResult.success) {
+          anySuccess = true;
+          console.log('✅ WhatsApp sent successfully');
+        }
+      } catch (waError) {
+        console.warn('⚠️ WhatsApp failed:', waError.message);
       }
-    } else {
-      console.log('⚠️ No phone number, skipping WhatsApp');
     }
 
-    // Fallback to Email if WhatsApp failed or not available
-    if (!deliverySuccess) {
-      console.log('📧 Attempting Email delivery...');
+    // Send Email (always)
+    console.log('📧 Sending via Email...');
+    try {
       const emailResult = await emailService.sendResetPasswordLink(user, resetLink);
-      
+      notifications.push({
+        channel: 'Email',
+        success: emailResult.success,
+        email: user.email
+      });
       if (emailResult.success) {
-        deliverySuccess = true;
-        deliveryChannel = 'Email';
-        console.log('✅ Email delivery successful');
-      } else {
-        console.log('❌ Email delivery failed');
+        anySuccess = true;
+        console.log('✅ Email sent successfully');
       }
+    } catch (emailError) {
+      console.warn('⚠️ Email failed:', emailError.message);
     }
+
+    console.log(`📨 Notification results:`, notifications);
 
     // Return response
-    if (deliverySuccess) {
+    if (anySuccess) {
+      const successChannels = notifications.filter(n => n.success).map(n => n.channel).join(' dan ');
       return res.status(200).json(
         successResponse(
-          `Link reset password telah dikirim via ${deliveryChannel}`,
-          { channel: deliveryChannel, expiresAt }
+          `Link reset password telah dikirim via ${successChannels}`,
+          { channels: notifications, expiresAt }
         )
       );
     } else {
-      // Token sudah dibuat tapi gagal kirim
+      // Token sudah dibuat tapi gagal kirim semua
       console.error('❌ All delivery channels failed');
       return res.status(500).json(
         errorResponse('Gagal mengirim link reset password. Silakan hubungi administrator.')
@@ -190,10 +201,11 @@ const resetPassword = async (req, res) => {
       );
     }
 
-    // Validasi password minimal 8 karakter
-    if (password.length < 8) {
+    // Validasi password strength
+    const validation = validatePasswordStrength(password);
+    if (!validation.isValid) {
       return res.status(400).json(
-        errorResponse('Password minimal 8 karakter')
+        errorResponse(getPasswordErrorMessage(validation.errors))
       );
     }
 
@@ -244,10 +256,11 @@ const changePassword = async (req, res) => {
       );
     }
 
-    // Validasi password baru minimal 8 karakter
-    if (newPassword.length < 8) {
+    // Validasi password baru strength
+    const validation = validatePasswordStrength(newPassword);
+    if (!validation.isValid) {
       return res.status(400).json(
-        errorResponse('Password baru minimal 8 karakter')
+        errorResponse(getPasswordErrorMessage(validation.errors))
       );
     }
 

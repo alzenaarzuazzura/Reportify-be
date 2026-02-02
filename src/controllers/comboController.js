@@ -24,6 +24,29 @@ const getLevelsCombo = async (req, res) => {
 };
 
 /**
+ * Get rooms combo
+ * @route GET /combo/rooms
+ */
+const getRoomsCombo = async (req, res) => {
+  try {
+    const data = await comboService.getRooms();
+    
+    return res.status(200).json({
+      data,
+      message: 'success',
+      status: true,
+    });
+  } catch (error) {
+    console.error('Error getRoomsCombo:', error);
+    return res.status(500).json({
+      data: [],
+      message: 'failed',
+      status: false,
+    });
+  }
+};
+
+/**
  * Get subjects combo
  * @route GET /combo/subjects
  */
@@ -242,5 +265,6 @@ module.exports = {
   getSubjectsCombo,
   getClassesCombo,
   getTeachingAssignmentsCombo,
-  getCurrentScheduleCombo
+  getCurrentScheduleCombo,
+  getRoomsCombo
 };

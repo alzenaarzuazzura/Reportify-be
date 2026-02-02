@@ -36,7 +36,7 @@ const getAllSchedules = async (req, res) => {
         { teaching_assignment: { 
           subject: { name: { contains: search } }
         }},
-        { room: { contains: search } }
+        { room: { name: { contains: search } } }
       ];
     }
 
@@ -66,7 +66,7 @@ const getAllSchedules = async (req, res) => {
 
     // Filter by room
     if (room) {
-      where.room = { contains: room };
+      where.id_room = parseInt(room);
     }
 
     // Filter by time range - find schedules that overlap with the given time range
@@ -113,7 +113,8 @@ const getAllSchedules = async (req, res) => {
             },
             subject: true,
           }
-        }
+        },
+        room: true
       }
     });
 
@@ -151,7 +152,10 @@ const getAllSchedules = async (req, res) => {
         day: schedule.day,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        room: schedule.room
+        id_room: {
+          value: schedule.room?.id || null,
+          label: schedule.room?.name || '-'
+        }
       };
     });
 
@@ -178,7 +182,10 @@ const getScheduleById = async (req, res) => {
   try {
     const { id } = req.params;
     const schedule = await prisma.schedules.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
+      include: {
+        room: true
+      }
     });
 
     if (!schedule) {
@@ -232,7 +239,10 @@ const getScheduleById = async (req, res) => {
       day: schedule.day,
       start_time: schedule.start_time,
       end_time: schedule.end_time,
-      room: schedule.room
+      id_room: {
+        value: schedule.room.id,
+        label: schedule.room.name
+      }
     };
 
     return res.status(200).json(
@@ -248,7 +258,7 @@ const getScheduleById = async (req, res) => {
 
 const createSchedule = async (req, res) => {
   try {
-    const { id_teaching_assignment, day, start_time, end_time, room } = req.body;
+    const { id_teaching_assignment, day, start_time, end_time, id_room } = req.body;
 
     // Convert day to lowercase to match enum
     const normalizedDay = day ? day.toLowerCase() : null;
@@ -259,7 +269,7 @@ const createSchedule = async (req, res) => {
         day: normalizedDay,
         start_time,
         end_time,
-        room
+        id_room
       }
     });
 
@@ -289,6 +299,12 @@ const createSchedule = async (req, res) => {
       })
     ]);
 
+    // Fetch room data
+    const room = await prisma.rooms.findUnique({
+      where: { id: schedule.id_room },
+      select: { id: true, name: true }
+    });
+
     const formattedSchedule = {
       id: schedule.id,
       id_teaching_assignment: {
@@ -302,7 +318,10 @@ const createSchedule = async (req, res) => {
       day: schedule.day,
       start_time: schedule.start_time,
       end_time: schedule.end_time,
-      room: schedule.room
+      id_room: {
+        value: room.id,
+        label: room.name
+      }
     };
 
     return res.status(201).json(
@@ -319,7 +338,7 @@ const createSchedule = async (req, res) => {
 const updateSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { id_teaching_assignment, day, start_time, end_time, room } = req.body;
+    const { id_teaching_assignment, day, start_time, end_time, id_room } = req.body;
 
     // Check if schedule exists
     const existingSchedule = await prisma.schedules.findUnique({
@@ -338,7 +357,7 @@ const updateSchedule = async (req, res) => {
     if (day !== undefined) updateData.day = day.toLowerCase(); // Convert to lowercase for enum
     if (start_time !== undefined) updateData.start_time = start_time;
     if (end_time !== undefined) updateData.end_time = end_time;
-    if (room !== undefined) updateData.room = room;
+    if (id_room !== undefined) updateData.id_room = id_room;
 
     // Update schedule
     const schedule = await prisma.schedules.update({
@@ -378,6 +397,12 @@ const updateSchedule = async (req, res) => {
       );
     }
 
+    // Fetch room data
+    const room = await prisma.rooms.findUnique({
+      where: { id: schedule.id_room },
+      select: { id: true, name: true }
+    });
+
     const formattedSchedule = {
       id: schedule.id,
       id_teaching_assignment: {
@@ -391,7 +416,10 @@ const updateSchedule = async (req, res) => {
       day: schedule.day,
       start_time: schedule.start_time,
       end_time: schedule.end_time,
-      room: schedule.room
+      id_room: {
+        value: room.id,
+        label: room.name
+      }
     };
 
     return res.status(200).json(
@@ -494,7 +522,8 @@ const checkScheduleConflict = async (req, res) => {
             },
             subject: true
           }
-        }
+        },
+        room: true
       }
     });
 
@@ -519,7 +548,8 @@ const checkScheduleConflict = async (req, res) => {
             },
             subject: true
           }
-        }
+        },
+        room: true
       }
     });
 
@@ -538,7 +568,7 @@ const checkScheduleConflict = async (req, res) => {
         day: schedule.day,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        room: schedule.room
+        room: schedule.room?.name || '-'
       }));
 
       return res.status(200).json({
@@ -611,7 +641,8 @@ const getMySchedules = async (req, res) => {
             },
             subject: true
           }
-        }
+        },
+        room: true
       }
     });
 
@@ -631,7 +662,7 @@ const getMySchedules = async (req, res) => {
         day: schedule.day,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        room: schedule.room
+        room: schedule.room?.name || '-'
       };
     });
 
