@@ -164,7 +164,8 @@ const updateAssignment = async (req, res) => {
         id_teaching_assignment,
         assignment_title,
         assignment_desc,
-        deadline: new Date(deadline)
+        deadline: new Date(deadline),
+        updated_at: new Date()
       },
       include: {
         teaching_assignment: {
