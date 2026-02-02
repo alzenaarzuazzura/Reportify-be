@@ -508,11 +508,100 @@ const checkScheduleConflict = async (req, res) => {
   }
 };
 
+const getMySchedules = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { day, sortBy, sort, page = 1, limit = 100 } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {
+      teaching_assignment: {
+        id_user: userId
+      }
+    };
+
+    if (day) {
+      where.day = day.toLowerCase();
+    }
+
+    // Sorting
+    const validSortFields = ['day', 'start_time', 'end_time'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'day';
+    const sortOrder = (sort === 'desc' || sort === 'asc') ? sort : 'asc';
+    const orderBy = { [sortField]: sortOrder };
+
+    const total = await prisma.schedules.count({ where });
+
+    const schedules = await prisma.schedules.findMany({
+      where,
+      orderBy,
+      skip,
+      take: limitNum,
+      include: {
+        teaching_assignment: {
+          include: {
+            user: true,
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            },
+            subject: true
+          }
+        }
+      }
+    });
+
+    const formattedSchedules = schedules.map(schedule => {
+      const ta = schedule.teaching_assignment;
+      const kelas = ta?.class;
+      const subject = ta?.subject;
+
+      const classLabel = kelas
+        ? `${kelas.level.name} ${kelas.major.code} ${kelas.rombel.name}`
+        : '-';
+
+      return {
+        id: schedule.id,
+        class: classLabel,
+        subject: subject?.name || '-',
+        day: schedule.day,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        room: schedule.room
+      };
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Berhasil mengambil jadwal mengajar',
+      data: formattedSchedules,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Error getMySchedules:', error);
+    return res.status(500).json(
+      errorResponse('Gagal mengambil jadwal mengajar')
+    );
+  }
+};
+
 module.exports = {
   getAllSchedules,
   getScheduleById,
   createSchedule,
   updateSchedule,
   deleteSchedule,
-  checkScheduleConflict
+  checkScheduleConflict,
+  getMySchedules
 };
