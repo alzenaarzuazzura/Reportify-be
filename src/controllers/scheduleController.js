@@ -426,7 +426,7 @@ const deleteSchedule = async (req, res) => {
 
 const checkScheduleConflict = async (req, res) => {
   try {
-    const { day, start_time, end_time, exclude_id } = req.query;
+    const { day, start_time, end_time, exclude_id, id_teaching_assignment } = req.query;
 
     if (!day || !start_time || !end_time) {
       return res.status(400).json(
@@ -434,7 +434,28 @@ const checkScheduleConflict = async (req, res) => {
       );
     }
 
-    const where = {
+    if (!id_teaching_assignment) {
+      return res.status(400).json(
+        errorResponse('Parameter id_teaching_assignment harus diisi')
+      );
+    }
+
+    // Get teaching assignment info
+    const teachingAssignment = await prisma.teaching_assignments.findUnique({
+      where: { id: parseInt(id_teaching_assignment) },
+      select: { 
+        id_user: true,
+        id_class: true
+      }
+    });
+
+    if (!teachingAssignment) {
+      return res.status(404).json(
+        errorResponse('Teaching assignment tidak ditemukan')
+      );
+    }
+
+    const baseWhere = {
       day: day.toLowerCase(),
       AND: [
         {
@@ -447,13 +468,19 @@ const checkScheduleConflict = async (req, res) => {
     };
 
     if (exclude_id) {
-      where.NOT = {
+      baseWhere.NOT = {
         id: parseInt(exclude_id)
       };
     }
 
-    const conflictingSchedules = await prisma.schedules.findMany({
-      where,
+    // Check 1: Teacher conflict - same teacher teaching at the same time
+    const teacherConflicts = await prisma.schedules.findMany({
+      where: {
+        ...baseWhere,
+        teaching_assignment: {
+          id_user: teachingAssignment.id_user
+        }
+      },
       include: {
         teaching_assignment: {
           include: {
@@ -471,8 +498,39 @@ const checkScheduleConflict = async (req, res) => {
       }
     });
 
-    if (conflictingSchedules.length > 0) {
-      const conflicts = conflictingSchedules.map(schedule => ({
+    // Check 2: Class conflict - same class having another teacher at the same time
+    const classConflicts = await prisma.schedules.findMany({
+      where: {
+        ...baseWhere,
+        teaching_assignment: {
+          id_class: teachingAssignment.id_class
+        }
+      },
+      include: {
+        teaching_assignment: {
+          include: {
+            user: true,
+            class: {
+              include: {
+                level: true,
+                major: true,
+                rombel: true
+              }
+            },
+            subject: true
+          }
+        }
+      }
+    });
+
+    // Combine conflicts and remove duplicates
+    const allConflicts = [...teacherConflicts, ...classConflicts];
+    const uniqueConflicts = allConflicts.filter((conflict, index, self) =>
+      index === self.findIndex((c) => c.id === conflict.id)
+    );
+
+    if (uniqueConflicts.length > 0) {
+      const conflicts = uniqueConflicts.map(schedule => ({
         id: schedule.id,
         teacher: schedule.teaching_assignment.user.name,
         class: `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`,
