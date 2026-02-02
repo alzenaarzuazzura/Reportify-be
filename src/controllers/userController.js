@@ -525,7 +525,8 @@ const updateUser = async (req, res) => {
         email: true,
         phone: true,
         role: true,
-        created_at: true
+        created_at: true,
+        updated_at: true
       }
     });
 

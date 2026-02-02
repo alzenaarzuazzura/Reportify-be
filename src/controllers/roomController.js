@@ -5,14 +5,14 @@ const RoomService = require('../services/roomService');
  */
 const getRooms = async (req, res) => {
   try {
-    const { page, limit, search, sortBy, sortOrder } = req.query;
+    const { page, limit, search, order, sort } = req.query;
     
     const result = await RoomService.getRooms({
       page: parseInt(page) || 1,
       limit: parseInt(limit) || 20,
       search: search || '',
-      sortBy: sortBy || 'name',
-      sortOrder: sortOrder || 'asc'
+      sortBy: order || 'name',
+      sortOrder: sort || 'asc'
     });
 
     res.json({

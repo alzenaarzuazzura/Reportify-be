@@ -454,7 +454,10 @@ const deleteSchedule = async (req, res) => {
 
 const checkScheduleConflict = async (req, res) => {
   try {
-    const { day, start_time, end_time, exclude_id, id_teaching_assignment } = req.query;
+    const { day, start_time, end_time, exclude_id, id_teaching_assignment, id_room } = req.query;
+
+    console.log('=== CHECK SCHEDULE CONFLICT ===');
+    console.log('Query params:', { day, start_time, end_time, exclude_id, id_teaching_assignment, id_room });
 
     if (!day || !start_time || !end_time) {
       return res.status(400).json(
@@ -482,6 +485,8 @@ const checkScheduleConflict = async (req, res) => {
         errorResponse('Teaching assignment tidak ditemukan')
       );
     }
+
+    console.log('Teaching assignment:', teachingAssignment);
 
     const baseWhere = {
       day: day.toLowerCase(),
@@ -527,6 +532,8 @@ const checkScheduleConflict = async (req, res) => {
       }
     });
 
+    console.log('Teacher conflicts found:', teacherConflicts.length);
+
     // Check 2: Class conflict - same class having another teacher at the same time
     const classConflicts = await prisma.schedules.findMany({
       where: {
@@ -553,16 +560,49 @@ const checkScheduleConflict = async (req, res) => {
       }
     });
 
+    console.log('Class conflicts found:', classConflicts.length);
+
+    // Check 3: Room conflict - same room being used at the same time
+    let roomConflicts = [];
+    if (id_room) {
+      roomConflicts = await prisma.schedules.findMany({
+        where: {
+          ...baseWhere,
+          id_room: parseInt(id_room)
+        },
+        include: {
+          teaching_assignment: {
+            include: {
+              user: true,
+              class: {
+                include: {
+                  level: true,
+                  major: true,
+                  rombel: true
+                }
+              },
+              subject: true
+            }
+          },
+          room: true
+        }
+      });
+
+      console.log('Room conflicts found:', roomConflicts.length);
+    }
+
     // Combine conflicts and remove duplicates
-    const allConflicts = [...teacherConflicts, ...classConflicts];
+    const allConflicts = [...teacherConflicts, ...classConflicts, ...roomConflicts];
     const uniqueConflicts = allConflicts.filter((conflict, index, self) =>
       index === self.findIndex((c) => c.id === conflict.id)
     );
 
+    console.log('Total unique conflicts:', uniqueConflicts.length);
+
     if (uniqueConflicts.length > 0) {
       const conflicts = uniqueConflicts.map(schedule => ({
         id: schedule.id,
-        teacher: schedule.teaching_assignment.user.name,
+        teacher: schedule.tsignment.user.name,
         class: `${schedule.teaching_assignment.class.level.name} ${schedule.teaching_assignment.class.major.code} ${schedule.teaching_assignment.class.rombel.name}`,
         subject: schedule.teaching_assignment.subject.name,
         day: schedule.day,
@@ -571,15 +611,19 @@ const checkScheduleConflict = async (req, res) => {
         room: schedule.room?.name || '-'
       }));
 
+      console.log('Conflicts:', conflicts);
+
       return res.status(200).json({
         status: true,
         message: 'Ditemukan jadwal yang bentrok',
         data: {
           hasConflict: true,
-          conflicts: conflicts
+      ts: conflicts
         }
       });
     }
+
+    console.log('No conflicts found');
 
     return res.status(200).json({
       status: true,
