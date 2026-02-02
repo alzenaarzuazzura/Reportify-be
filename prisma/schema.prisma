@@ -13,8 +13,8 @@ model users {
   email                String                 @unique @db.VarChar(100)
   password             String                 @db.VarChar(255)
   role                 role_enum
-  created_at           DateTime               @default(now()) @db.DateTime(0)
-  updated_at           DateTime               @updatedAt @db.DateTime(0)
+  created_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
   reset_token          String?                @db.VarChar(255)
   reset_token_expired  DateTime?              @db.DateTime(0)
   phone                String?                @db.VarChar(20)
@@ -25,8 +25,8 @@ model levels {
   id         Int       @id @default(autoincrement())
   name       String    @db.VarChar(50)
   classes    classes[]
-  created_at DateTime  @default(now()) @db.DateTime(0)
-  updated_at DateTime  @updatedAt @db.DateTime(0)
+  created_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 }
 
 model majors {
@@ -34,24 +34,24 @@ model majors {
   name       String    @db.VarChar(50)
   code       String    @unique @db.VarChar(20)
   classes    classes[]
-  created_at DateTime  @default(now()) @db.DateTime(0)
-  updated_at DateTime  @updatedAt @db.DateTime(0)
+  created_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 }
 
 model rombels {
   id         Int       @id @default(autoincrement())
   name       String    @db.VarChar(50)
   classes    classes[]
-  created_at DateTime  @default(now()) @db.DateTime(0)
-  updated_at DateTime  @updatedAt @db.DateTime(0)
+  created_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at DateTime  @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 }
 
 model rooms {
   id         Int         @id @default(autoincrement())
   name       String      @db.VarChar(50)
   schedules  schedules[]
-  created_at DateTime    @default(now()) @db.DateTime(0)
-  updated_at DateTime    @updatedAt @db.DateTime(0)
+  created_at DateTime    @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at DateTime    @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 }
 
 model classes {
@@ -64,8 +64,8 @@ model classes {
   rombel               rombels                @relation(fields: [id_rombel], references: [id], onDelete: Cascade)
   students             students[]
   teaching_assignments teaching_assignments[]
-  created_at           DateTime               @default(now()) @db.DateTime(0)
-  updated_at           DateTime               @updatedAt @db.DateTime(0)
+  created_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@index([id_level])
   @@index([id_major])
@@ -79,8 +79,8 @@ model students {
   name                String                @db.VarChar(100)
   parent_telephone    String                @db.VarChar(20)
   student_telephone   String?               @db.VarChar(20)
-  created_at          DateTime              @default(now()) @db.DateTime(0)
-  updated_at          DateTime              @updatedAt @db.DateTime(0)
+  created_at          DateTime              @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at          DateTime              @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
   attendances         attendances[]
   student_assignments student_assignments[]
   class               classes               @relation(fields: [id_class], references: [id], onDelete: Cascade)
@@ -93,8 +93,8 @@ model subjects {
   name                 String                 @db.VarChar(100)
   code                 String                 @unique @db.VarChar(20)
   teaching_assignments teaching_assignments[]
-  created_at           DateTime               @default(now()) @db.DateTime(0)
-  updated_at           DateTime               @updatedAt @db.DateTime(0)
+  created_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 }
 
 model teaching_assignments {
@@ -109,8 +109,8 @@ model teaching_assignments {
   class         classes         @relation(fields: [id_class], references: [id], onDelete: Cascade)
   subject       subjects        @relation(fields: [id_subject], references: [id], onDelete: Cascade)
   user          users           @relation(fields: [id_user], references: [id], onDelete: Cascade)
-  created_at    DateTime        @default(now()) @db.DateTime(0)
-  updated_at    DateTime        @updatedAt @db.DateTime(0)
+  created_at    DateTime        @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at    DateTime        @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@index([id_user])
   @@index([id_class])
@@ -128,8 +128,8 @@ model schedules {
   attendances            attendances[]
   teaching_assignment    teaching_assignments @relation(fields: [id_teaching_assignment], references: [id], onDelete: Cascade)
   room                   rooms                @relation(fields: [id_room], references: [id], onDelete: Cascade)
-  created_at             DateTime             @default(now()) @db.DateTime(0)
-  updated_at             DateTime             @updatedAt @db.DateTime(0)
+  created_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@index([id_teaching_assignment])
 }
@@ -146,8 +146,8 @@ model attendances {
   schedule               schedules            @relation(fields: [id_schedule], references: [id], onDelete: Cascade)
   student                students             @relation(fields: [id_student], references: [id], onDelete: Cascade)
   teaching_assignment    teaching_assignments @relation(fields: [id_teaching_assignment], references: [id], onDelete: Cascade)
-  created_at             DateTime             @default(now()) @db.DateTime(0)
-  updated_at             DateTime             @updatedAt @db.DateTime(0)
+  created_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@index([id_student])
   @@index([id_teaching_assignment])
@@ -160,8 +160,8 @@ model assignments {
   assignment_title       String                @db.VarChar(200)
   assignment_desc        String                @db.Text
   deadline               DateTime              @db.Date
-  created_at             DateTime              @default(now()) @db.DateTime(0)
-  updated_at             DateTime              @updatedAt @db.DateTime(0)
+  created_at             DateTime              @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at             DateTime              @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
   teaching_assignment    teaching_assignments  @relation(fields: [id_teaching_assignment], references: [id], onDelete: Cascade)
   student_assignments    student_assignments[]
 
@@ -174,8 +174,8 @@ model announcements {
   title                  String               @db.VarChar(200)
   desc                   String               @db.Text
   date                   DateTime             @db.Date
-  created_at             DateTime             @default(now()) @db.DateTime(0)
-  updated_at             DateTime             @updatedAt @db.DateTime(0)
+  created_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at             DateTime             @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
   teaching_assignment    teaching_assignments @relation(fields: [id_teaching_assignment], references: [id], onDelete: Cascade)
 
   @@index([id_teaching_assignment])
@@ -190,8 +190,8 @@ model student_assignments {
   note          String?     @db.Text
   assignment    assignments @relation(fields: [id_assignment], references: [id], onDelete: Cascade)
   student       students    @relation(fields: [id_student], references: [id], onDelete: Cascade)
-  created_at    DateTime    @default(now()) @db.DateTime(0)
-  updated_at    DateTime    @updatedAt @db.DateTime(0)
+  created_at    DateTime    @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updated_at    DateTime    @default(dbgenerated("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@index([id_student])
   @@index([id_assignment])

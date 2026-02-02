@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
 
+// Use centralized Prisma client with timezone handling
+const prisma = require('./utils/prismaClient');
+
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const studentRoutes = require('./routes/studentRoutes');
