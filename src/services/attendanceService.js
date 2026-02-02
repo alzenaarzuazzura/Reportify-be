@@ -307,7 +307,8 @@ class AttendanceService {
             id: true,
             nis: true,
             name: true,
-            parent_telephone: true
+            parent_telephone: true,
+            student_telephone: true
           }
         }
       }

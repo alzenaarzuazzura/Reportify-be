@@ -32,6 +32,7 @@ const getProfile = async (req, res) => {
         phone: true,
         role: true,
         created_at: true,
+        updated_at: true,
       }
     });
 
